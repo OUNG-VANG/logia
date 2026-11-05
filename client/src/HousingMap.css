@@ -1,0 +1,236 @@
+.housing-map {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e8e0ed;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 14px 40px #3618460a;
+}
+
+.housing-map-toolbar {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 10px 15px;
+  border-bottom: 1px solid #eee8f2;
+  background: #fff;
+}
+
+.housing-map-layer-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid #e8e1ec;
+  border-radius: 9px;
+  background: #f8f6fa;
+}
+
+.housing-map-layer-switch button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 13px;
+  color: #716579;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 620;
+  cursor: pointer;
+}
+
+.housing-map-layer-switch button.active {
+  color: #fff;
+  background: #6502b9;
+  box-shadow: 0 2px 7px #42106d25;
+}
+
+.housing-map-layer-switch button:focus-visible,
+.housing-map-popup-link:focus-visible {
+  outline: 3px solid #f5a35f;
+  outline-offset: 2px;
+}
+
+.housing-map-count {
+  color: #82758a;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.housing-map-canvas {
+  width: 100%;
+  height: clamp(360px, 43vw, 590px);
+  background: #e9e9e6;
+  isolation: isolate;
+}
+
+.housing-map-canvas .leaflet-container {
+  width: 100%;
+  height: 100%;
+  color: #302238;
+  font-family: inherit;
+  background: #e9e9e6;
+}
+
+.housing-map-canvas .leaflet-control-attribution {
+  max-width: min(72%, 520px);
+  font-size: 9px;
+}
+
+.housing-map-canvas .leaflet-control-zoom a {
+  color: #4a3656;
+}
+
+.housing-map-legend {
+  min-height: 43px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 15px;
+  border-top: 1px solid #eee8f2;
+  color: #857990;
+  background: #fff;
+  font-size: 9px;
+}
+
+.housing-map-legend > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #615368;
+}
+
+.housing-map-legend-pin {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #fc6700;
+  box-shadow: 0 0 0 3px #fc670021;
+}
+
+.housing-map-marker-wrap {
+  border: 0;
+  background: transparent;
+}
+
+.housing-map-marker {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 3px solid #fff;
+  border-radius: 50% 50% 50% 4px;
+  color: #fff;
+  background: #fc6700;
+  box-shadow: 0 3px 12px #29173550;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  transform: rotate(-45deg);
+}
+
+.housing-map-marker > span { transform: rotate(45deg); }
+
+.housing-map-marker-wrap:hover .housing-map-marker,
+.housing-map-marker-wrap:focus .housing-map-marker {
+  background: #6502b9;
+}
+
+.housing-map-popup {
+  min-width: 175px;
+  color: #34233d;
+  font-family: inherit;
+}
+
+.housing-map-popup-heading {
+  display: block;
+  color: #3c2549;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.housing-map-popup-precision {
+  margin: 4px 0 9px;
+  color: #897b91;
+  font-size: 10px;
+}
+
+.housing-map-popup-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 8px;
+  padding: 9px 0;
+  border-top: 1px solid #eee8f2;
+}
+
+.housing-map-popup-title {
+  overflow: hidden;
+  color: #493456;
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.housing-map-popup-item small {
+  color: #766882;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.housing-map-popup-link {
+  grid-column: 1 / -1;
+  justify-self: start;
+  border: 0;
+  padding: 2px 0;
+  color: #6502b9;
+  background: transparent;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.housing-map-popup-more {
+  display: block;
+  padding-top: 7px;
+  color: #897b91;
+  font-size: 10px;
+}
+
+@media (max-width: 760px) {
+  .housing-map-toolbar {
+    min-height: 54px;
+    padding: 8px 10px;
+  }
+
+  .housing-map-layer-switch button {
+    min-height: 31px;
+    padding: 0 10px;
+    font-size: 10px;
+  }
+
+  .housing-map-canvas {
+    height: min(112vw, 470px);
+    min-height: 335px;
+  }
+
+  .housing-map-legend {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    line-height: 1.45;
+  }
+
+  .housing-map-count {
+    font-size: 9px;
+    text-align: right;
+  }
+}
