@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import api from './lib/api'
 import LandingPage from './LandingPage'
 import HousingMap from './HousingMap'
+import { ApplyBox, LandlordApplications, TenantApplications } from './Applications'
 import './App.css'
 
 const emptyHousingForm = {
@@ -131,6 +132,11 @@ function App() {
   const [locationSavingId, setLocationSavingId] = useState('')
   const [locationUpdateError, setLocationUpdateError] = useState('')
   const [locationUpdateMessage, setLocationUpdateMessage] = useState('')
+  const [applications, setApplications] = useState([])
+  const [applicationsLoading, setApplicationsLoading] = useState(false)
+  const [applicationsError, setApplicationsError] = useState('')
+  const [applicationBusyId, setApplicationBusyId] = useState('')
+  const [applyError, setApplyError] = useState('')
 
   useEffect(() => {
     const token = sessionStorage.getItem('logia-token')
@@ -207,6 +213,79 @@ function App() {
     return () => { active = false }
   }, [user])
 
+  useEffect(() => {
+    if (!user) return
+
+    let active = true
+    setApplicationsLoading(true)
+    setApplicationsError('')
+    const endpoint = user.role === 'landlord' ? '/applications/received' : '/applications/mine'
+
+    api.get(endpoint)
+      .then(({ data }) => { if (active) setApplications(data.applications || []) })
+      .catch((requestError) => {
+        if (active) setApplicationsError(requestError.response?.data?.message || 'Impossible de charger les candidatures.')
+      })
+      .finally(() => { if (active) setApplicationsLoading(false) })
+
+    return () => { active = false }
+  }, [user])
+
+  function replaceApplication(updated) {
+    setApplications((current) => {
+      const exists = current.some((item) => item._id === updated._id)
+      return exists
+        ? current.map((item) => item._id === updated._id ? updated : item)
+        : [updated, ...current]
+    })
+  }
+
+  function selectHousing(housing) {
+    setApplyError('')
+    setSelectedHousing(housing)
+  }
+
+  async function openHousingFromApplication(housing) {
+    selectHousing(housing)
+    try {
+      const { data } = await api.get('/housing/' + housing._id)
+      setSelectedHousing((current) => current?._id === housing._id ? data.listing : current)
+    } catch {
+      // L'annonce n'est plus publiée : on garde les informations résumées.
+    }
+  }
+
+  async function applyToHousing(housingId, message) {
+    setApplicationBusyId(housingId)
+    setApplyError('')
+    try {
+      const { data } = await api.post('/applications', { housingId, message })
+      replaceApplication(data.application)
+    } catch (requestError) {
+      setApplyError(requestError.response?.data?.message || 'Impossible d’envoyer la candidature.')
+    } finally {
+      setApplicationBusyId('')
+    }
+  }
+
+  async function updateApplicationStatus(application, status) {
+    if (status === 'withdrawn' && !window.confirm('Retirer ta candidature pour « ' + (application.housing?.title || 'ce logement') + ' » ?')) return
+
+    setApplicationBusyId(application._id)
+    setApplyError('')
+    setApplicationsError('')
+    try {
+      const { data } = await api.patch('/applications/' + application._id + '/status', { status })
+      replaceApplication(data.application)
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || 'Impossible de mettre à jour la candidature.'
+      if (selectedHousing) setApplyError(message)
+      else setApplicationsError(message)
+    } finally {
+      setApplicationBusyId('')
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
@@ -257,6 +336,7 @@ function App() {
     setPassword('')
     setError('')
     setListings([])
+    setApplications([])
     setSelectedHousing(null)
   }
 
@@ -438,7 +518,20 @@ function App() {
               </div>
               <h2>Description</h2>
               <p className="housing-detail-description">{selectedHousing.description || 'Aucune description complémentaire.'}</p>
-              {!user && <div className="public-detail-cta"><p>Crée ton espace locataire pour poursuivre ta recherche sur Logia.</p><button className="home-button home-button-primary" type="button" onClick={() => openAuth('register', 'tenant')}>Créer mon compte <span aria-hidden="true">→</span></button></div>}
+              {user?.role === 'tenant' && (() => {
+                const application = applications.find((item) => item.housing?._id === selectedHousing._id)
+                return (
+                  <ApplyBox
+                    key={selectedHousing._id}
+                    application={application}
+                    busy={applicationBusyId === selectedHousing._id || (application && applicationBusyId === application._id)}
+                    error={applyError}
+                    onApply={(message) => applyToHousing(selectedHousing._id, message)}
+                    onWithdraw={(item) => updateApplicationStatus(item, 'withdrawn')}
+                  />
+                )
+              })()}
+              {!user && <div className="public-detail-cta"><p>Crée ton espace locataire pour postuler à ce logement.</p><button className="home-button home-button-primary" type="button" onClick={() => openAuth('register', 'tenant')}>Créer mon compte <span aria-hidden="true">→</span></button></div>}
             </div>
           </article>
         </section>
@@ -453,7 +546,7 @@ function App() {
       error={housingError}
       onSignIn={() => openAuth('login')}
       onRegister={(nextRole) => openAuth('register', nextRole)}
-      onSelectListing={setSelectedHousing}
+      onSelectListing={selectHousing}
     />
   }
 
@@ -601,7 +694,14 @@ function App() {
                     {locationUpdateMessage && <p className="form-success" role="status">{locationUpdateMessage}</p>}
                   </div>
                 )}
-                <ListingResults listings={listings} loading={listingsLoading} error={housingError} emptyMessage="Tes annonces publiées apparaîtront ici." onSelect={setSelectedHousing} />
+                <ListingResults listings={listings} loading={listingsLoading} error={housingError} emptyMessage="Tes annonces publiées apparaîtront ici." onSelect={selectHousing} />
+                <LandlordApplications
+                  applications={applications}
+                  loading={applicationsLoading}
+                  error={applicationsError}
+                  busyId={applicationBusyId}
+                  onDecide={updateApplicationStatus}
+                />
               </section>
             </div>
           ) : (
@@ -611,7 +711,7 @@ function App() {
                   <div><p className="eyebrow">LOGEMENTS À PROXIMITÉ</p><h2 id="tenant-map-title">Explore la carte</h2></div>
                   <p className="tenant-map-intro">Zoome sur les rues ou passe en satellite. Sélectionne un repère pour ouvrir l’annonce.</p>
                 </div>
-                <HousingMap listings={listings} loading={listingsLoading} onSelectListing={setSelectedHousing} />
+                <HousingMap listings={listings} loading={listingsLoading} onSelectListing={selectHousing} />
               </section>
 
               <section className="listings-panel tenant-listings" aria-labelledby="housing-search-title">
@@ -662,8 +762,17 @@ function App() {
                 <div><label htmlFor="search-rent">Loyer maximum</label><input id="search-rent" type="number" min="0" value={maxRent} onChange={(event) => setMaxRent(event.target.value)} placeholder="€ / mois" /></div>
                 <button className="submit-button" type="submit" disabled={listingsLoading}>Rechercher <span aria-hidden="true">→</span></button>
                 </form>
-                <ListingResults listings={listings} loading={listingsLoading} error={housingError} emptyMessage="Aucun logement ne correspond encore à ta recherche. Essaie une autre ville ou un autre budget." onSelect={setSelectedHousing} />
+                <ListingResults listings={listings} loading={listingsLoading} error={housingError} emptyMessage="Aucun logement ne correspond encore à ta recherche. Essaie une autre ville ou un autre budget." onSelect={selectHousing} />
               </section>
+
+              <TenantApplications
+                applications={applications}
+                loading={applicationsLoading}
+                error={applicationsError}
+                busyId={applicationBusyId}
+                onWithdraw={(application) => updateApplicationStatus(application, 'withdrawn')}
+                onSelectHousing={openHousingFromApplication}
+              />
             </>
           )}
         </section>

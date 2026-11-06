@@ -5,6 +5,7 @@ const path = require('path');
 require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const housingRoutes = require('./routes/housing');
+const applicationRoutes = require('./routes/applications');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -17,6 +18,7 @@ app.use('/api/uploads', express.static(path.join(__dirname, '../uploads'), {
 }));
 app.use('/api/auth', authRoutes);
 app.use('/api/housing', housingRoutes);
+app.use('/api/applications', applicationRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'API Logia opérationnelle.' });

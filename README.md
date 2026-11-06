@@ -17,3 +17,10 @@ Les modèles Mongoose se trouvent dans `server/src/models` : utilisateur, logeme
 L’authentification est disponible avec `POST /api/auth/register` et `POST /api/auth/login`. Le jeton Bearer retourné permet d’accéder à `GET /api/auth/me`. Les rôles accessibles à l’inscription sont `tenant` et `landlord` ; les comptes administrateur ne peuvent pas être créés via l’API publique.
 
 Les annonces sont accessibles avec `GET /api/housing` (filtres facultatifs `city` et `maxRent`). Un propriétaire authentifié peut publier une annonce avec `POST /api/housing` et consulter ses annonces avec `GET /api/housing/mine`.
+
+Les candidatures passent par `/api/applications` (authentification requise) :
+
+- `POST /api/applications` : un locataire postule à une annonce publiée (`housingId`, `message` facultatif). Une candidature retirée peut être renvoyée.
+- `GET /api/applications/mine` : le locataire consulte ses candidatures et leur statut.
+- `GET /api/applications/received` : le propriétaire consulte les candidatures reçues sur ses annonces.
+- `PATCH /api/applications/:id/status` : le propriétaire accepte (`accepted`) ou refuse (`rejected`) ; le locataire retire une candidature en attente (`withdrawn`).
