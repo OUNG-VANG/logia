@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import HousingMap from './HousingMap'
+import HousingMap from './LazyHousingMap'
 import './LandingPage.css'
 
 function normalize(value = '') {

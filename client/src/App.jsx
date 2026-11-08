@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import api from './lib/api'
 import LandingPage from './LandingPage'
-import HousingMap from './HousingMap'
+import HousingMap from './LazyHousingMap'
 import { ApplyBox, LandlordApplications, TenantApplications } from './Applications'
 import ProfileFields from './ProfileFields'
 import ProfilePanel from './ProfilePanel'
