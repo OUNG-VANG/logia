@@ -6,6 +6,7 @@ import { ApplyBox, LandlordApplications, TenantApplications } from './Applicatio
 import ProfileFields from './ProfileFields'
 import ProfilePanel from './ProfilePanel'
 import DossierPanel from './DossierPanel'
+import ConfirmButton from './ConfirmButton'
 import { emptyProfile, profilePayload } from './lib/profile'
 import './App.css'
 
@@ -285,8 +286,6 @@ function App() {
   }
 
   async function updateApplicationStatus(application, status) {
-    if (status === 'withdrawn' && !window.confirm('Retirer ta candidature pour « ' + (application.housing?.title || 'ce logement') + ' » ?')) return
-
     setApplicationBusyId(application._id)
     setApplyError('')
     setApplicationsError('')
@@ -456,9 +455,6 @@ function App() {
   }
 
   async function deleteListing(listing) {
-    const warning = 'Supprimer définitivement l’annonce « ' + listing.title + ' » ?\n\nSes photos et les candidatures reçues seront aussi supprimées.'
-    if (!window.confirm(warning)) return
-
     setDeletingListingId(listing._id)
     setDeleteListingError('')
     setDeleteListingMessage('')
@@ -1018,19 +1014,16 @@ function ListingResults({ listings, loading, error, emptyMessage, onSelect, onDe
             <div className="housing-card-footer">
               <p className="housing-card-link">Voir le détail <span aria-hidden="true">→</span></p>
               {onDelete && (
-                <button
+                <ConfirmButton
                   className="housing-card-delete"
-                  type="button"
-                  disabled={deletingId === listing._id}
-                  aria-label={`Supprimer l’annonce : ${listing.title}`}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onDelete(listing)
-                  }}
-                  onKeyDown={(event) => event.stopPropagation()}
-                >
-                  {deletingId === listing._id ? 'Suppression…' : 'Supprimer'}
-                </button>
+                  label="Supprimer"
+                  ariaLabel={`Supprimer l’annonce : ${listing.title}`}
+                  question="Supprimer avec ses photos et candidatures ?"
+                  confirmLabel="Oui, supprimer"
+                  busy={deletingId === listing._id}
+                  busyLabel="Suppression…"
+                  onConfirm={() => onDelete(listing)}
+                />
               )}
             </div>
           </div>

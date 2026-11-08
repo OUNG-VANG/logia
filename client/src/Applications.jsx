@@ -3,6 +3,7 @@ import api from './lib/api'
 import { dossierCategoryLabels } from './lib/dossier'
 import { formatEuros, fullName, guarantorLabels, situationLabels } from './lib/profile'
 import ApplicantDossier from './ApplicantDossier'
+import ConfirmButton from './ConfirmButton'
 import './Applications.css'
 
 const applicationStatusLabels = {
@@ -51,9 +52,14 @@ export function ApplyBox({ application, busy, error, onApply, onWithdraw, onComp
         {application.message && <p className="apply-box-message">« {application.message} »</p>}
         {error && <p className="form-error" role="alert">{error}</p>}
         {application.status === 'pending' && (
-          <button className="text-button" type="button" disabled={busy} onClick={() => onWithdraw(application)}>
-            {busy ? 'Un instant…' : 'Retirer ma candidature'}
-          </button>
+          <ConfirmButton
+            label="Retirer ma candidature"
+            question="Retirer ta candidature ?"
+            confirmLabel="Oui, retirer"
+            busy={busy}
+            busyLabel="Retrait…"
+            onConfirm={() => onWithdraw(application)}
+          />
         )}
       </div>
     )
@@ -185,9 +191,15 @@ export function TenantApplications({ applications, loading, error, busyId, onWit
                     <div className="application-actions">
                       <StatusBadge status={application.status} />
                       {application.status === 'pending' && (
-                        <button className="text-button" type="button" disabled={busyId === application._id} onClick={() => onWithdraw(application)}>
-                          Retirer
-                        </button>
+                        <ConfirmButton
+                          label="Retirer"
+                          ariaLabel={`Retirer ma candidature pour ${application.housing?.title || 'ce logement'}`}
+                          question="Retirer ta candidature ?"
+                          confirmLabel="Oui, retirer"
+                          busy={busyId === application._id}
+                          busyLabel="Retrait…"
+                          onConfirm={() => onWithdraw(application)}
+                        />
                       )}
                     </div>
                   </li>

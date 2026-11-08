@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import api from './lib/api'
+import ConfirmButton from './ConfirmButton'
 import {
   dossierCategories, fileToDataUrl, forbiddenDocuments, formatFileSize, openDossierDocument,
 } from './lib/dossier'
@@ -62,7 +63,6 @@ function DossierPanel({ guarantorType }) {
   }
 
   async function removeDocument(document) {
-    if (!window.confirm(`Retirer « ${document.originalName} » de ton dossier ?`)) return
     setBusyDocumentId(document._id)
     setError('')
     try {
@@ -150,9 +150,16 @@ function DossierPanel({ guarantorType }) {
                           {document.originalName}
                         </button>
                         <small>{document.mimeType === 'application/pdf' ? 'PDF' : 'Image'} · {formatFileSize(document.size)}</small>
-                        <button className="dossier-file-remove" type="button" disabled={busyDocumentId === document._id} onClick={() => removeDocument(document)} aria-label={`Retirer ${document.originalName}`}>
-                          Retirer
-                        </button>
+                        <ConfirmButton
+                          className="dossier-file-remove"
+                          label="Retirer"
+                          ariaLabel={`Retirer ${document.originalName}`}
+                          question="Retirer ce fichier ?"
+                          confirmLabel="Oui"
+                          busy={busyDocumentId === document._id}
+                          busyLabel="Retrait…"
+                          onConfirm={() => removeDocument(document)}
+                        />
                       </li>
                     ))}
                   </ul>
