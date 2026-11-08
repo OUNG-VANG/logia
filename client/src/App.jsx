@@ -9,6 +9,7 @@ import DossierPanel from './DossierPanel'
 import ConfirmButton from './ConfirmButton'
 import Recommendations from './Recommendations'
 import { ListingMatch } from './MatchScore'
+import Analytics from './Analytics'
 import { emptyProfile, profilePayload } from './lib/profile'
 import './App.css'
 
@@ -115,6 +116,7 @@ function App() {
   const [role, setRole] = useState('tenant')
   const [registerProfile, setRegisterProfile] = useState(emptyProfile)
   const [showProfile, setShowProfile] = useState(false)
+  const [showAnalytics, setShowAnalytics] = useState(false)
   const [user, setUser] = useState(null)
   const [showAuth, setShowAuth] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -360,6 +362,7 @@ function App() {
     setApplicationsLoadedFor(null)
     setSelectedHousing(null)
     setShowProfile(false)
+    setShowAnalytics(false)
   }
 
   function chooseCity(city) {
@@ -607,6 +610,20 @@ function App() {
     />
   }
 
+  if (user && showAnalytics) {
+    return (
+      <main className="app-shell">
+        <header className="topbar">
+          <a className="wordmark" href="/" aria-label="Logia, accueil">
+            <img className="brand-logo" src="/logia-logo.png" alt="Logia" />
+          </a>
+          <button className="text-button" type="button" onClick={logout}>Se déconnecter</button>
+        </header>
+        <Analytics onBack={() => { setShowAnalytics(false); window.scrollTo({ top: 0 }) }} />
+      </main>
+    )
+  }
+
   if (user) {
     const isLandlord = user.role === 'landlord'
     return (
@@ -630,6 +647,9 @@ function App() {
               <span className="role-pill">{isLandlord ? 'Propriétaire' : 'Locataire'}</span>
               <button className="text-button" type="button" onClick={() => setShowProfile((open) => !open)} aria-expanded={showProfile}>
                 {showProfile ? 'Fermer mon profil' : 'Mon profil'}
+              </button>
+              <button className="text-button analytics-link" type="button" onClick={() => { setShowAnalytics(true); window.scrollTo({ top: 0 }) }}>
+                Observatoire
               </button>
             </div>
           </div>

@@ -60,7 +60,7 @@ async function applicationReadiness(tenantId) {
   const documents = await TenantDocument.find({ tenant: tenantId }).select('category');
   const profileComplete = isProfileComplete(tenant);
   const dossier = dossierSummary(tenant, documents);
-  return { ready: profileComplete && dossier.complete, profileComplete, dossier };
+  return { ready: profileComplete && dossier.complete, profileComplete, dossier, tenant };
 }
 
 function readinessMessage(readiness) {
@@ -78,7 +78,8 @@ router.get('/readiness', async (req, res) => {
     const tenant = await loadUserWithRole(req, res, 'tenant', 'Réservé aux comptes locataires.');
     if (!tenant) return;
     const readiness = await applicationReadiness(tenant._id);
-    return res.json({ ...readiness, message: readiness.ready ? '' : readinessMessage(readiness) });
+    const { tenant: _tenant, ...publicReadiness } = readiness;
+    return res.json({ ...publicReadiness, message: readiness.ready ? '' : readinessMessage(readiness) });
   } catch (error) {
     console.error('Erreur lors de la vérification du dossier :', error.message);
     return res.status(500).json({ message: 'Impossible de vérifier ton dossier pour le moment.' });
@@ -102,7 +103,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Ton message doit faire 2000 caractères au maximum.' });
     }
 
-    const housing = await Housing.findOne({ _id: body.housingId, status: 'published' }).select('_id');
+    const housing = await Housing.findOne({ _id: body.housingId, status: 'published' }).select(housingFields);
     if (!housing) {
       return res.status(404).json({ message: 'Ce logement n’est plus disponible.' });
     }
@@ -121,14 +122,19 @@ router.post('/', async (req, res) => {
       });
     }
 
+    const profile = readiness.tenant.tenantProfile ? readiness.tenant.tenantProfile.toObject() : {};
+    const matchScore = computeMatch(profile, housing, readiness.dossier).score ?? undefined;
+
     let application;
     if (existing) {
       // Une candidature retirée peut être renvoyée.
       existing.status = 'pending';
       existing.message = message;
+      existing.matchScore = matchScore;
+      existing.decidedAt = undefined;
       application = await existing.save();
     } else {
-      application = await Application.create({ tenant: tenant._id, housing: housing._id, message });
+      application = await Application.create({ tenant: tenant._id, housing: housing._id, message, matchScore });
     }
 
     await application.populate('housing', housingFields);
@@ -218,6 +224,7 @@ router.patch('/:id/status', async (req, res) => {
     }
 
     application.status = status;
+    if (status === 'accepted' || status === 'rejected') application.decidedAt = new Date();
     await application.save();
     application.housing.landlord = undefined;
     if (user.role === 'landlord') {

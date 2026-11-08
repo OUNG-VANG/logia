@@ -65,3 +65,23 @@ Un critère sans donnée est écarté et les poids restants sont renormalisés ;
 - `GET /api/applications/received` renvoie aussi `match` pour chaque candidat ; l’interface les trie par compatibilité.
 
 Les tests du calcul se lancent depuis `server` avec `npm test`.
+
+## Observatoire (analyse de données)
+
+La page « Observatoire », accessible depuis le tableau de bord, affiche des statistiques agrégées, sans aucune donnée personnelle (`GET /api/analytics`, authentification requise) :
+
+- chiffres clés : annonces publiées, loyer moyen, taux d’acceptation, délai moyen de réponse des propriétaires ;
+- taux d’acceptation par tranche de score de compatibilité (0–39, 40–59, 60–79, 80–100), et score moyen des candidatures acceptées et refusées ;
+- loyer moyen, médian et au m² par ville ;
+- candidatures par statut et situation des candidats.
+
+Le score de compatibilité est enregistré au moment de chaque candidature (`matchScore`) et la date de la réponse du propriétaire dans `decidedAt`. Le taux d’acceptation ne compte que les candidatures acceptées ou refusées. Les calculs sont dans `server/src/lib/analytics.js` et testés avec `npm test`.
+
+Pour remplir une base **de test** avec un jeu de démonstration (3 propriétaires, 10 annonces, 12 locataires, environ 36 candidatures), lance une API sur une base séparée puis le script :
+
+```bash
+PORT=5099 MONGODB_URI=mongodb://127.0.0.1:27017/logia_demo npm start
+node scripts/seed-demo.mjs http://localhost:5099/api
+```
+
+Le script ne doit jamais viser ta vraie base. Il dépose de petits fichiers de test dans `server/private-uploads/dossiers`.

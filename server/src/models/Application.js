@@ -24,6 +24,10 @@ const applicationSchema = new mongoose.Schema(
       default: 'pending',
       index: true,
     },
+    // Score de compatibilité figé au moment de l'envoi, pour l'analyse (le profil peut changer ensuite).
+    matchScore: { type: Number, min: 0, max: 100 },
+    // Date à laquelle le propriétaire a accepté ou refusé.
+    decidedAt: Date,
   },
   { timestamps: true },
 );
