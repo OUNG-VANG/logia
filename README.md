@@ -18,7 +18,11 @@ L’API répond sur `http://localhost:5001`. La route `GET /api/health` indique 
 
 Les modèles Mongoose se trouvent dans `server/src/models` : utilisateur, logement et candidature.
 
-L’authentification est disponible avec `POST /api/auth/register` et `POST /api/auth/login`. Le jeton Bearer retourné permet d’accéder à `GET /api/auth/me`. Les rôles accessibles à l’inscription sont `tenant` et `landlord` ; les comptes administrateur ne peuvent pas être créés via l’API publique.
+L’authentification est disponible avec `POST /api/auth/register` et `POST /api/auth/login`. Le jeton Bearer retourné permet d’accéder à `GET /api/auth/me` et de modifier son profil avec `PATCH /api/auth/me`.
+
+À l’inscription, chaque compte renseigne `firstName`, `lastName` et `gender` (`female`, `male`, `other`, `undisclosed`). Un locataire renseigne aussi `tenantProfile` : `birthDate` et `situation` sont obligatoires (`student`, `apprentice`, `employee_permanent`, `employee_fixed_term`, `temporary_worker`, `self_employed`, `civil_servant`, `job_seeker`, `retired`, `other`) ; `occupationDetail`, `monthlyIncome`, `guarantorType` (`none`, `family`, `visale`, `organization`, `other`), `householdSize`, `desiredMoveIn`, `desiredCity` et `maxBudget` sont facultatifs. Les règles de validation sont dans `server/src/lib/profile.js`.
+
+Un propriétaire voit le nom, la situation, les revenus, le garant, le nombre d’occupants et la date d’emménagement de ses candidats, mais jamais leur date de naissance ni leur civilité : le sexe et l’âge ne doivent pas servir à choisir un locataire (article 225-1 du Code pénal). La fiche publique d’une annonce affiche le prénom et l’initiale du propriétaire. Les rôles accessibles à l’inscription sont `tenant` et `landlord` ; les comptes administrateur ne peuvent pas être créés via l’API publique.
 
 Les annonces sont accessibles avec `GET /api/housing` (filtres facultatifs `city` et `maxRent`). Un propriétaire authentifié peut publier une annonce avec `POST /api/housing` et consulter ses annonces avec `GET /api/housing/mine`. Il peut supprimer une de ses annonces avec `DELETE /api/housing/:id` : ses photos et les candidatures reçues sont supprimées avec elle.
 

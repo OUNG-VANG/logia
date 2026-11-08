@@ -7,6 +7,7 @@ const Housing = require('../models/Housing');
 const Application = require('../models/Application');
 const User = require('../models/User');
 const requireAuth = require('../middleware/requireAuth');
+const { publicLandlordName } = require('../lib/profile');
 
 const router = express.Router();
 const uploadsDirectory = path.join(__dirname, '../../uploads');
@@ -239,10 +240,14 @@ router.get('/:id', async (req, res) => {
 
   try {
     const listing = await Housing.findOne({ _id: req.params.id, status: 'published' })
-      .select('title description propertyType location rent charges areaM2 bedrooms availableFrom amenities images createdAt');
+      .select('title description propertyType location rent charges areaM2 bedrooms availableFrom amenities images createdAt landlord')
+      .populate('landlord', 'firstName lastName');
 
     if (!listing) return res.status(404).json({ message: 'Logement introuvable.' });
-    return res.json({ listing });
+    const result = listing.toObject();
+    result.landlordName = publicLandlordName(listing.landlord);
+    delete result.landlord;
+    return res.json({ listing: result });
   } catch (error) {
     console.error('Erreur lors du chargement du logement :', error.message);
     return res.status(500).json({ message: 'Impossible de charger ce logement pour le moment.' });

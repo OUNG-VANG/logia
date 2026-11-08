@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatEuros, fullName, guarantorLabels, situationLabels } from './lib/profile'
 import './Applications.css'
 
 const applicationStatusLabels = {
@@ -65,6 +66,20 @@ export function ApplyBox({ application, busy, error, onApply, onWithdraw }) {
   )
 }
 
+// Résumé du candidat visible par le propriétaire.
+function ApplicantFacts({ tenant }) {
+  if (!tenant) return null
+  const facts = [
+    tenant.situation && (situationLabels[tenant.situation] + (tenant.occupationDetail ? ` · ${tenant.occupationDetail}` : '')),
+    tenant.monthlyIncome != null && `${formatEuros(tenant.monthlyIncome)} nets / mois`,
+    tenant.guarantorType && guarantorLabels[tenant.guarantorType],
+    tenant.householdSize && `${tenant.householdSize} occupant${tenant.householdSize > 1 ? 's' : ''}`,
+    tenant.desiredMoveIn && `Emménagement le ${formatDate(tenant.desiredMoveIn)}`,
+  ].filter(Boolean)
+  if (!facts.length) return <p className="application-facts-empty">Profil locataire pas encore complété.</p>
+  return <ul className="application-facts">{facts.map((fact) => <li key={fact}>{fact}</li>)}</ul>
+}
+
 // Liste des candidatures du locataire.
 export function TenantApplications({ applications, loading, error, busyId, onWithdraw, onSelectHousing }) {
   const visible = applications.filter((application) => application.status !== 'withdrawn')
@@ -126,10 +141,12 @@ export function LandlordApplications({ applications, loading, error, busyId, onD
                 {applications.map((application) => (
                   <li className="application-item" key={application._id}>
                     <div className="application-main">
-                      <span className="application-title">{application.housing?.title || 'Annonce supprimée'}</span>
+                      <span className="application-title">{fullName(application.tenant) || application.tenant?.email || 'Locataire'}</span>
                       <p className="application-meta">
-                        {application.tenant?.email || 'Locataire'} · Reçue le {formatDate(application.createdAt)}
+                        Pour « {application.housing?.title || 'Annonce supprimée'} » · Reçue le {formatDate(application.createdAt)}
+                        {fullName(application.tenant) && application.tenant?.email && <> · <a href={`mailto:${application.tenant.email}`}>{application.tenant.email}</a></>}
                       </p>
+                      <ApplicantFacts tenant={application.tenant} />
                       {application.message && <p className="application-message">« {application.message} »</p>}
                     </div>
                     <div className="application-actions">

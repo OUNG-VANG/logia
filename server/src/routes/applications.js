@@ -4,9 +4,18 @@ const Application = require('../models/Application');
 const Housing = require('../models/Housing');
 const User = require('../models/User');
 const requireAuth = require('../middleware/requireAuth');
+const { applicantSummary } = require('../lib/profile');
 
 const router = express.Router();
 const housingFields = 'title propertyType location rent charges images status';
+const applicantFields = 'email firstName lastName tenantProfile';
+
+// Remplace le compte locataire complet par ce qu'un propriétaire a le droit de voir.
+function forLandlord(application) {
+  const result = application.toObject();
+  result.tenant = applicantSummary(application.tenant);
+  return result;
+}
 
 function databaseUnavailable(res) {
   if (mongoose.connection.readyState === 1) return false;
@@ -108,10 +117,10 @@ router.get('/received', async (req, res) => {
     const housingIds = await Housing.find({ landlord: landlord._id }).distinct('_id');
     const applications = await Application.find({ housing: { $in: housingIds }, status: { $ne: 'withdrawn' } })
       .populate('housing', housingFields)
-      .populate('tenant', 'email')
+      .populate('tenant', applicantFields)
       .sort({ createdAt: -1 })
       .limit(200);
-    return res.json({ applications });
+    return res.json({ applications: applications.map(forLandlord) });
   } catch (error) {
     console.error('Erreur lors du chargement des candidatures reçues :', error.message);
     return res.status(500).json({ message: 'Impossible de charger les candidatures reçues pour le moment.' });
@@ -155,8 +164,11 @@ router.patch('/:id/status', async (req, res) => {
 
     application.status = status;
     await application.save();
-    await application.populate('tenant', 'email');
     application.housing.landlord = undefined;
+    if (user.role === 'landlord') {
+      await application.populate('tenant', applicantFields);
+      return res.json({ application: forLandlord(application) });
+    }
     return res.json({ application });
   } catch (error) {
     console.error('Erreur lors de la mise à jour de la candidature :', error.message);

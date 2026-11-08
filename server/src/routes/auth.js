@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const requireAuth = require('../middleware/requireAuth');
+const { ProfileError, parseProfile, publicUser } = require('../lib/profile');
 
 const router = express.Router();
 const allowedRoles = new Set(['tenant', 'landlord']);
@@ -22,14 +23,6 @@ function createToken(user) {
   return jwt.sign({ sub: user._id.toString() }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '1d',
   });
-}
-
-function publicUser(user) {
-  return {
-    id: user._id,
-    email: user.email,
-    role: user.role,
-  };
 }
 
 function databaseUnavailable(res) {
@@ -66,9 +59,17 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ message: 'Rôle invalide. Choisis tenant ou landlord.' });
   }
 
+  let profile;
+  try {
+    profile = parseProfile(body, role);
+  } catch (error) {
+    if (error instanceof ProfileError) return res.status(400).json({ message: error.message });
+    throw error;
+  }
+
   try {
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = await User.create({ email, passwordHash, role });
+    const user = await User.create({ email, passwordHash, role, ...profile });
 
     return res.status(201).json({
       user: publicUser(user),
@@ -136,6 +137,36 @@ router.get('/me', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Erreur lors de la lecture du compte :', error.message);
     return res.status(500).json({ message: 'Impossible de charger le compte pour le moment.' });
+  }
+});
+
+// Mise à jour du profil (nom, civilité, profil locataire). L'e-mail, le rôle et le mot de passe ne changent pas ici.
+router.patch('/me', requireAuth, async (req, res) => {
+  if (databaseUnavailable(res)) return;
+
+  try {
+    const user = await User.findById(req.auth.userId);
+    if (!user) {
+      return res.status(401).json({ message: 'Ce compte n’existe plus.' });
+    }
+
+    let profile;
+    try {
+      profile = parseProfile(req.body, user.role);
+    } catch (error) {
+      if (error instanceof ProfileError) return res.status(400).json({ message: error.message });
+      throw error;
+    }
+
+    user.set(profile);
+    await user.save();
+    return res.json({ user: publicUser(user) });
+  } catch (error) {
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: 'Les informations du profil sont invalides.' });
+    }
+    console.error('Erreur lors de la mise à jour du profil :', error.message);
+    return res.status(500).json({ message: 'Impossible d’enregistrer le profil pour le moment.' });
   }
 });
 

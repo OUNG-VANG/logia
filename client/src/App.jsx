@@ -3,6 +3,9 @@ import api from './lib/api'
 import LandingPage from './LandingPage'
 import HousingMap from './HousingMap'
 import { ApplyBox, LandlordApplications, TenantApplications } from './Applications'
+import ProfileFields from './ProfileFields'
+import ProfilePanel from './ProfilePanel'
+import { emptyProfile, profilePayload } from './lib/profile'
 import './App.css'
 
 const emptyHousingForm = {
@@ -106,6 +109,8 @@ function App() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState('tenant')
+  const [registerProfile, setRegisterProfile] = useState(emptyProfile)
+  const [showProfile, setShowProfile] = useState(false)
   const [user, setUser] = useState(null)
   const [showAuth, setShowAuth] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -245,18 +250,15 @@ function App() {
     })
   }
 
-  function selectHousing(housing) {
+  // Affiche l'annonce tout de suite, puis charge sa fiche complète (avec le nom du propriétaire).
+  async function selectHousing(housing) {
     setApplyError('')
     setSelectedHousing(housing)
-  }
-
-  async function openHousingFromApplication(housing) {
-    selectHousing(housing)
     try {
       const { data } = await api.get('/housing/' + housing._id)
-      setSelectedHousing((current) => current?._id === housing._id ? data.listing : current)
+      setSelectedHousing((current) => current?._id === housing._id ? { ...current, ...data.listing } : current)
     } catch {
-      // L'annonce n'est plus publiée : on garde les informations résumées.
+      // L'annonce n'est plus publiée : on garde les informations déjà connues.
     }
   }
 
@@ -298,12 +300,15 @@ function App() {
 
     try {
       const endpoint = mode === 'register' ? '/auth/register' : '/auth/login'
-      const payload = mode === 'register' ? { email, password, role } : { email, password }
+      const payload = mode === 'register'
+        ? { email, password, role, ...profilePayload(registerProfile, role) }
+        : { email, password }
       const { data } = await api.post(endpoint, payload)
       sessionStorage.setItem('logia-token', data.token)
       setUser(data.user)
       setShowAuth(false)
       setPassword('')
+      setRegisterProfile(emptyProfile)
     } catch (requestError) {
       setError(
         requestError.response?.data?.message ||
@@ -344,6 +349,7 @@ function App() {
     setApplications([])
     setApplicationsLoadedFor(null)
     setSelectedHousing(null)
+    setShowProfile(false)
   }
 
   function chooseCity(city) {
@@ -546,6 +552,7 @@ function App() {
               </div>
               <h2>Description</h2>
               <p className="housing-detail-description">{selectedHousing.description || 'Aucune description complémentaire.'}</p>
+              {selectedHousing.landlordName && <p className="housing-detail-landlord">Proposé par <strong>{selectedHousing.landlordName}</strong></p>}
               {user?.role === 'tenant' && (() => {
                 const application = applications.find((item) => item.housing?._id === selectedHousing._id)
                 return (
@@ -593,10 +600,34 @@ function App() {
             <div>
               <p className="eyebrow">TON ESPACE LOGIA</p>
               <h1>{isLandlord ? 'Tes logements.' : 'Trouvons ton prochain chez-toi.'}</h1>
-              <p className="welcome-copy">Connecté·e avec <strong>{user.email}</strong></p>
+              <p className="welcome-copy">
+                {user.firstName ? <>Bonjour <strong>{user.firstName}</strong> · {user.email}</> : <>Connecté·e avec <strong>{user.email}</strong></>}
+              </p>
             </div>
-            <span className="role-pill">{isLandlord ? 'Propriétaire' : 'Locataire'}</span>
+            <div className="dashboard-heading-actions">
+              <span className="role-pill">{isLandlord ? 'Propriétaire' : 'Locataire'}</span>
+              <button className="text-button" type="button" onClick={() => setShowProfile((open) => !open)} aria-expanded={showProfile}>
+                {showProfile ? 'Fermer mon profil' : 'Mon profil'}
+              </button>
+            </div>
           </div>
+
+          {!user.profileComplete && !showProfile && (
+            <div className="profile-reminder" role="status">
+              <p><strong>Complète ton profil.</strong> {isLandlord
+                ? 'Ton nom sera affiché sur tes annonces.'
+                : 'Les propriétaires verront ton nom et ta situation quand tu postules.'}</p>
+              <button className="text-button" type="button" onClick={() => setShowProfile(true)}>Compléter <span aria-hidden="true">→</span></button>
+            </div>
+          )}
+
+          {showProfile && (
+            <ProfilePanel
+              user={user}
+              onSaved={setUser}
+              onClose={() => setShowProfile(false)}
+            />
+          )}
 
           {isLandlord ? (
             <div className="landlord-layout">
@@ -809,7 +840,7 @@ function App() {
                 error={applicationsError}
                 busyId={applicationBusyId}
                 onWithdraw={(application) => updateApplicationStatus(application, 'withdrawn')}
-                onSelectHousing={openHousingFromApplication}
+                onSelectHousing={selectHousing}
               />
             </>
           )}
@@ -914,6 +945,7 @@ function App() {
                   <option value="tenant">À la recherche d’un logement</option>
                   <option value="landlord">Propriétaire d’un logement</option>
                 </select>
+                <ProfileFields role={role} value={registerProfile} onChange={setRegisterProfile} idPrefix="register" />
               </>
             )}
 
