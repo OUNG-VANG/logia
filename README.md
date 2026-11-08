@@ -2,6 +2,10 @@
 
 Plateforme d’aide à la recherche de logements locatifs en France.
 
+## Démarrer le frontend
+
+Depuis `client`, lance `npm run dev`. Vite redirige les appels `/api` vers `http://127.0.0.1:5001`. Pour viser une autre API (par exemple un serveur de test), définis `LOGIA_API_URL`, par exemple `LOGIA_API_URL=http://127.0.0.1:5099 npm run dev`.
+
 ## Démarrer le backend
 
 1. Depuis `server`, crée un fichier `.env` à partir de `.env.example`.
@@ -16,7 +20,7 @@ Les modèles Mongoose se trouvent dans `server/src/models` : utilisateur, logeme
 
 L’authentification est disponible avec `POST /api/auth/register` et `POST /api/auth/login`. Le jeton Bearer retourné permet d’accéder à `GET /api/auth/me`. Les rôles accessibles à l’inscription sont `tenant` et `landlord` ; les comptes administrateur ne peuvent pas être créés via l’API publique.
 
-Les annonces sont accessibles avec `GET /api/housing` (filtres facultatifs `city` et `maxRent`). Un propriétaire authentifié peut publier une annonce avec `POST /api/housing` et consulter ses annonces avec `GET /api/housing/mine`.
+Les annonces sont accessibles avec `GET /api/housing` (filtres facultatifs `city` et `maxRent`). Un propriétaire authentifié peut publier une annonce avec `POST /api/housing` et consulter ses annonces avec `GET /api/housing/mine`. Il peut supprimer une de ses annonces avec `DELETE /api/housing/:id` : ses photos et les candidatures reçues sont supprimées avec elle.
 
 Les candidatures passent par `/api/applications` (authentification requise) :
 

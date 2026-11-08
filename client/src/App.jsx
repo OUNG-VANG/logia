@@ -133,10 +133,13 @@ function App() {
   const [locationUpdateError, setLocationUpdateError] = useState('')
   const [locationUpdateMessage, setLocationUpdateMessage] = useState('')
   const [applications, setApplications] = useState([])
-  const [applicationsLoading, setApplicationsLoading] = useState(false)
+  const [applicationsLoadedFor, setApplicationsLoadedFor] = useState(null)
   const [applicationsError, setApplicationsError] = useState('')
   const [applicationBusyId, setApplicationBusyId] = useState('')
   const [applyError, setApplyError] = useState('')
+  const [deletingListingId, setDeletingListingId] = useState('')
+  const [deleteListingError, setDeleteListingError] = useState('')
+  const [deleteListingMessage, setDeleteListingMessage] = useState('')
 
   useEffect(() => {
     const token = sessionStorage.getItem('logia-token')
@@ -217,16 +220,18 @@ function App() {
     if (!user) return
 
     let active = true
-    setApplicationsLoading(true)
-    setApplicationsError('')
     const endpoint = user.role === 'landlord' ? '/applications/received' : '/applications/mine'
 
     api.get(endpoint)
-      .then(({ data }) => { if (active) setApplications(data.applications || []) })
+      .then(({ data }) => {
+        if (!active) return
+        setApplications(data.applications || [])
+        setApplicationsError('')
+      })
       .catch((requestError) => {
         if (active) setApplicationsError(requestError.response?.data?.message || 'Impossible de charger les candidatures.')
       })
-      .finally(() => { if (active) setApplicationsLoading(false) })
+      .finally(() => { if (active) setApplicationsLoadedFor(user.id) })
 
     return () => { active = false }
   }, [user])
@@ -337,6 +342,7 @@ function App() {
     setError('')
     setListings([])
     setApplications([])
+    setApplicationsLoadedFor(null)
     setSelectedHousing(null)
   }
 
@@ -434,6 +440,26 @@ function App() {
     }
   }
 
+  async function deleteListing(listing) {
+    const warning = 'Supprimer définitivement l’annonce « ' + listing.title + ' » ?\n\nSes photos et les candidatures reçues seront aussi supprimées.'
+    if (!window.confirm(warning)) return
+
+    setDeletingListingId(listing._id)
+    setDeleteListingError('')
+    setDeleteListingMessage('')
+    try {
+      await api.delete('/housing/' + listing._id)
+      setListings((current) => current.filter((item) => item._id !== listing._id))
+      setApplications((current) => current.filter((item) => item.housing?._id !== listing._id))
+      if (selectedHousing?._id === listing._id) setSelectedHousing(null)
+      setDeleteListingMessage('L’annonce « ' + listing.title + ' » a été supprimée.')
+    } catch (requestError) {
+      setDeleteListingError(requestError.response?.data?.message || 'Impossible de supprimer cette annonce.')
+    } finally {
+      setDeletingListingId('')
+    }
+  }
+
   async function handlePhotoChange(event) {
     const files = Array.from(event.target.files || [])
     event.target.value = ''
@@ -476,6 +502,8 @@ function App() {
     const { name, value } = event.target
     setHousingForm((current) => ({ ...current, [name]: value }))
   }
+
+  const applicationsLoading = Boolean(user) && applicationsLoadedFor !== user.id
 
   if (checkingSession) {
     return <main className="loading-screen" aria-live="polite">Ouverture de ton espace…</main>
@@ -694,7 +722,17 @@ function App() {
                     {locationUpdateMessage && <p className="form-success" role="status">{locationUpdateMessage}</p>}
                   </div>
                 )}
-                <ListingResults listings={listings} loading={listingsLoading} error={housingError} emptyMessage="Tes annonces publiées apparaîtront ici." onSelect={selectHousing} />
+                {deleteListingError && <p className="form-error" role="alert">{deleteListingError}</p>}
+                {deleteListingMessage && <p className="form-success" role="status">{deleteListingMessage}</p>}
+                <ListingResults
+                  listings={listings}
+                  loading={listingsLoading}
+                  error={housingError}
+                  emptyMessage="Tes annonces publiées apparaîtront ici."
+                  onSelect={selectHousing}
+                  onDelete={deleteListing}
+                  deletingId={deletingListingId}
+                />
                 <LandlordApplications
                   applications={applications}
                   loading={applicationsLoading}
@@ -893,7 +931,7 @@ function App() {
   )
 }
 
-function ListingResults({ listings, loading, error, emptyMessage, onSelect }) {
+function ListingResults({ listings, loading, error, emptyMessage, onSelect, onDelete, deletingId }) {
   if (loading) return <p className="listings-feedback">Chargement des logements…</p>
   if (error) return <p className="listings-feedback form-error" role="alert">{error}</p>
   if (!listings.length) return <p className="listings-feedback">{emptyMessage}</p>
@@ -929,7 +967,24 @@ function ListingResults({ listings, loading, error, emptyMessage, onSelect }) {
               {listing.bedrooms > 0 && <span>{listing.bedrooms} ch.</span>}
             </div>
             {listing.status && listing.status !== 'published' && <p className="draft-note">Brouillon</p>}
-            <p className="housing-card-link">Voir le détail <span aria-hidden="true">→</span></p>
+            <div className="housing-card-footer">
+              <p className="housing-card-link">Voir le détail <span aria-hidden="true">→</span></p>
+              {onDelete && (
+                <button
+                  className="housing-card-delete"
+                  type="button"
+                  disabled={deletingId === listing._id}
+                  aria-label={`Supprimer l’annonce : ${listing.title}`}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onDelete(listing)
+                  }}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  {deletingId === listing._id ? 'Suppression…' : 'Supprimer'}
+                </button>
+              )}
+            </div>
           </div>
         </article>
       ))}

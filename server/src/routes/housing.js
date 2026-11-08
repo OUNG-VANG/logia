@@ -4,6 +4,7 @@ const path = require('path');
 const { mkdir, writeFile, unlink } = require('fs/promises');
 const { randomUUID } = require('crypto');
 const Housing = require('../models/Housing');
+const Application = require('../models/Application');
 const User = require('../models/User');
 const requireAuth = require('../middleware/requireAuth');
 
@@ -204,6 +205,29 @@ router.post('/', requireAuth, async (req, res) => {
     }
     console.error('Erreur lors de la création du logement :', error.message);
     return res.status(500).json({ message: 'Impossible de publier le logement pour le moment.' });
+  }
+});
+
+router.delete('/:id', requireAuth, async (req, res) => {
+  if (databaseUnavailable(res)) return;
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ message: 'Identifiant de logement invalide.' });
+  }
+
+  try {
+    const listing = await Housing.findOneAndDelete({ _id: req.params.id, landlord: req.auth.userId });
+    if (!listing) return res.status(404).json({ message: 'Logement introuvable dans tes annonces.' });
+
+    // Les candidatures liées n'ont plus de sens sans l'annonce.
+    await Application.deleteMany({ housing: listing._id });
+    await Promise.all((listing.images || []).map((imagePath) => (
+      unlink(path.join(uploadsDirectory, path.basename(imagePath))).catch(() => {})
+    )));
+
+    return res.json({ deletedId: listing._id });
+  } catch (error) {
+    console.error('Erreur lors de la suppression du logement :', error.message);
+    return res.status(500).json({ message: 'Impossible de supprimer ce logement pour le moment.' });
   }
 });
 

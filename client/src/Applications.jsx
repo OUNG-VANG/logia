@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import './Applications.css'
 
-export const applicationStatusLabels = {
+const applicationStatusLabels = {
   pending: 'En attente',
   accepted: 'Acceptée',
   rejected: 'Refusée',
