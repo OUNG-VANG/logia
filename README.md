@@ -28,7 +28,8 @@ Les annonces sont accessibles avec `GET /api/housing` (filtres facultatifs `city
 
 Les candidatures passent par `/api/applications` (authentification requise) :
 
-- `POST /api/applications` : un locataire postule à une annonce publiée (`housingId`, `message` facultatif). Une candidature retirée peut être renvoyée.
+- `POST /api/applications` : un locataire postule à une annonce publiée (`housingId`, `message` facultatif). Il faut un profil complet et toutes les pièces obligatoires du dossier, sinon la réponse est `403` avec `code` (`PROFILE_INCOMPLETE` ou `DOSSIER_INCOMPLETE`) et `missing` (pièces manquantes). Une candidature retirée peut être renvoyée, aux mêmes conditions.
+- `GET /api/applications/readiness` : indique au locataire s’il peut postuler (`ready`) et ce qu’il lui manque.
 - `GET /api/applications/mine` : le locataire consulte ses candidatures et leur statut.
 - `GET /api/applications/received` : le propriétaire consulte les candidatures reçues sur ses annonces.
 - `PATCH /api/applications/:id/status` : le propriétaire accepte (`accepted`) ou refuse (`rejected`) ; le locataire retire une candidature en attente (`withdrawn`).

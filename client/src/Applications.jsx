@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import api from './lib/api'
+import { dossierCategoryLabels } from './lib/dossier'
 import { formatEuros, fullName, guarantorLabels, situationLabels } from './lib/profile'
 import ApplicantDossier from './ApplicantDossier'
 import './Applications.css'
@@ -19,10 +21,26 @@ function StatusBadge({ status }) {
 }
 
 // Encadré affiché sur la page d'une annonce pour un locataire connecté.
-export function ApplyBox({ application, busy, error, onApply, onWithdraw }) {
+// Le locataire ne peut postuler que si son profil et son dossier sont complets.
+export function ApplyBox({ application, busy, error, onApply, onWithdraw, onCompleteDossier, onCompleteProfile }) {
   const [message, setMessage] = useState('')
+  const [readiness, setReadiness] = useState(null)
+  const [readinessError, setReadinessError] = useState('')
+  const hasActiveApplication = Boolean(application && application.status !== 'withdrawn')
 
-  if (application && application.status !== 'withdrawn') {
+  useEffect(() => {
+    if (hasActiveApplication) return undefined
+    let active = true
+    api.get('/applications/readiness')
+      .then(({ data }) => { if (active) { setReadiness(data); setReadinessError('') } })
+      .catch((requestError) => {
+        if (active) setReadinessError(requestError.response?.data?.message || 'Impossible de vérifier ton dossier.')
+      })
+    return () => { active = false }
+    // On revérifie après une erreur d'envoi (par exemple si une pièce a été retirée entre-temps).
+  }, [hasActiveApplication, error])
+
+  if (hasActiveApplication) {
     return (
       <div className="apply-box">
         <div className="apply-box-heading">
@@ -41,6 +59,36 @@ export function ApplyBox({ application, busy, error, onApply, onWithdraw }) {
     )
   }
 
+  if (readinessError) {
+    return <div className="apply-box"><p className="form-error" role="alert">{readinessError}</p></div>
+  }
+
+  if (!readiness) {
+    return <div className="apply-box"><p className="apply-box-note">Vérification de ton dossier…</p></div>
+  }
+
+  if (!readiness.ready) {
+    const missing = readiness.dossier?.missing || []
+    return (
+      <div className="apply-box apply-box-blocked" role="status">
+        <h2>Complète ton dossier pour postuler</h2>
+        <p className="apply-box-note">{readiness.message}</p>
+        {readiness.profileComplete && missing.length > 0 && (
+          <ul className="apply-box-missing">
+            {missing.map((key) => <li key={key}>{dossierCategoryLabels[key] || key}</li>)}
+          </ul>
+        )}
+        <button
+          className="submit-button"
+          type="button"
+          onClick={readiness.profileComplete ? onCompleteDossier : onCompleteProfile}
+        >
+          {readiness.profileComplete ? 'Compléter mon dossier' : 'Compléter mon profil'} <span aria-hidden="true">→</span>
+        </button>
+      </div>
+    )
+  }
+
   return (
     <form
       className="apply-box"
@@ -50,6 +98,7 @@ export function ApplyBox({ application, busy, error, onApply, onWithdraw }) {
       }}
     >
       <h2>Ce logement t’intéresse ?</h2>
+      <p className="apply-box-ready">✓ Ton dossier est complet : le propriétaire pourra le consulter.</p>
       <label htmlFor="application-message">Message au propriétaire (facultatif)</label>
       <textarea
         id="application-message"

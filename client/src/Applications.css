@@ -7,6 +7,10 @@
 .apply-box-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .apply-box-heading h2 { margin: 0; }
 .apply-box-note { margin: 8px 0 0; color: #76697f; font-size: 12px; }
+.apply-box-blocked { border-color: #f3d9c4; background: #fdf6f0; }
+.apply-box-blocked .apply-box-note { margin: 0 0 12px; color: #5d4a52; line-height: 1.55; }
+.apply-box-missing { margin: 0 0 16px; padding-left: 18px; color: #a34a00; font-size: 12px; line-height: 1.8; }
+.apply-box-ready { margin: -4px 0 14px; color: #1f6b35; font-size: 12px; }
 .apply-box-message { margin: 10px 0 4px; color: #4b3d54; font-size: 13px; line-height: 1.6; white-space: pre-line; }
 
 .applications-panel { margin-top: 27px; }

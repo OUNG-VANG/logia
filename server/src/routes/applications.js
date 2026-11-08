@@ -5,7 +5,7 @@ const Housing = require('../models/Housing');
 const User = require('../models/User');
 const requireAuth = require('../middleware/requireAuth');
 const TenantDocument = require('../models/TenantDocument');
-const { applicantSummary } = require('../lib/profile');
+const { applicantSummary, isProfileComplete } = require('../lib/profile');
 const { dossierSummary } = require('../lib/dossier');
 
 const router = express.Router();
@@ -48,7 +48,36 @@ async function loadUserWithRole(req, res, role, message) {
   return user;
 }
 
+// Un locataire ne peut postuler qu'avec un profil complet et toutes les pièces obligatoires de son dossier.
+async function applicationReadiness(tenantId) {
+  const tenant = await User.findById(tenantId).select('role firstName lastName gender tenantProfile');
+  const documents = await TenantDocument.find({ tenant: tenantId }).select('category');
+  const profileComplete = isProfileComplete(tenant);
+  const dossier = dossierSummary(tenant, documents);
+  return { ready: profileComplete && dossier.complete, profileComplete, dossier };
+}
+
+function readinessMessage(readiness) {
+  if (!readiness.profileComplete) return 'Complète d’abord ton profil (nom, situation…) avant de postuler.';
+  const count = readiness.dossier.missing.length;
+  return `Ton dossier n’est pas complet : il manque ${count} pièce${count > 1 ? 's' : ''} obligatoire${count > 1 ? 's' : ''}. ${count > 1 ? 'Ajoute-les' : 'Ajoute-la'} dans « Mon dossier » pour pouvoir postuler.`;
+}
+
 router.use(requireAuth);
+
+// Locataire : peut-il postuler maintenant ?
+router.get('/readiness', async (req, res) => {
+  if (databaseUnavailable(res)) return;
+  try {
+    const tenant = await loadUserWithRole(req, res, 'tenant', 'Réservé aux comptes locataires.');
+    if (!tenant) return;
+    const readiness = await applicationReadiness(tenant._id);
+    return res.json({ ...readiness, message: readiness.ready ? '' : readinessMessage(readiness) });
+  } catch (error) {
+    console.error('Erreur lors de la vérification du dossier :', error.message);
+    return res.status(500).json({ message: 'Impossible de vérifier ton dossier pour le moment.' });
+  }
+});
 
 // Locataire : postuler à une annonce publiée.
 router.post('/', async (req, res) => {
@@ -75,6 +104,15 @@ router.post('/', async (req, res) => {
     const existing = await Application.findOne({ tenant: tenant._id, housing: housing._id });
     if (existing && existing.status !== 'withdrawn') {
       return res.status(409).json({ message: 'Tu as déjà postulé à ce logement.' });
+    }
+
+    const readiness = await applicationReadiness(tenant._id);
+    if (!readiness.ready) {
+      return res.status(403).json({
+        code: readiness.profileComplete ? 'DOSSIER_INCOMPLETE' : 'PROFILE_INCOMPLETE',
+        message: readinessMessage(readiness),
+        missing: readiness.dossier.missing,
+      });
     }
 
     let application;

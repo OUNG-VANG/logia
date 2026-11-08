@@ -146,6 +146,7 @@ function publicLandlordName(user) {
 }
 
 module.exports = {
+  isProfileComplete,
   genders,
   situations,
   guarantorTypes,

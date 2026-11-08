@@ -263,6 +263,14 @@ function App() {
     }
   }
 
+  // Revient au tableau de bord puis fait défiler jusqu'à une section (ex. « Mon dossier »).
+  function leaveDetailAndScrollTo(elementId) {
+    setSelectedHousing(null)
+    window.setTimeout(() => {
+      document.getElementById(elementId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+  }
+
   async function applyToHousing(housingId, message) {
     setApplicationBusyId(housingId)
     setApplyError('')
@@ -564,6 +572,11 @@ function App() {
                     error={applyError}
                     onApply={(message) => applyToHousing(selectedHousing._id, message)}
                     onWithdraw={(item) => updateApplicationStatus(item, 'withdrawn')}
+                    onCompleteDossier={() => leaveDetailAndScrollTo('dossier-title')}
+                    onCompleteProfile={() => {
+                      setShowProfile(true)
+                      leaveDetailAndScrollTo('profile-title')
+                    }}
                   />
                 )
               })()}
