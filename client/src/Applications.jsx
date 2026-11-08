@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { formatEuros, fullName, guarantorLabels, situationLabels } from './lib/profile'
+import ApplicantDossier from './ApplicantDossier'
 import './Applications.css'
 
 const applicationStatusLabels = {
@@ -80,6 +81,31 @@ function ApplicantFacts({ tenant }) {
   return <ul className="application-facts">{facts.map((fact) => <li key={fact}>{fact}</li>)}</ul>
 }
 
+// État du dossier du candidat, avec la possibilité de l'ouvrir.
+function ApplicationDossier({ application }) {
+  const [open, setOpen] = useState(false)
+  const dossier = application.dossier
+  const tenantId = application.tenant?.id
+  if (!dossier || !tenantId) return null
+
+  const active = application.status === 'pending' || application.status === 'accepted'
+  return (
+    <>
+      <div className="application-dossier-row">
+        <span className={'dossier-badge' + (dossier.complete ? ' complete' : '')}>
+          {dossier.complete ? 'Dossier complet' : `Dossier : ${dossier.providedCount} / ${dossier.requiredCount} pièces`}
+        </span>
+        {active && dossier.documentCount > 0 && (
+          <button className="application-dossier-toggle" type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+            {open ? 'Masquer le dossier' : 'Voir le dossier'}
+          </button>
+        )}
+      </div>
+      {open && active && <ApplicantDossier tenantId={tenantId} />}
+    </>
+  )
+}
+
 // Liste des candidatures du locataire.
 export function TenantApplications({ applications, loading, error, busyId, onWithdraw, onSelectHousing }) {
   const visible = applications.filter((application) => application.status !== 'withdrawn')
@@ -147,6 +173,7 @@ export function LandlordApplications({ applications, loading, error, busyId, onD
                         {fullName(application.tenant) && application.tenant?.email && <> · <a href={`mailto:${application.tenant.email}`}>{application.tenant.email}</a></>}
                       </p>
                       <ApplicantFacts tenant={application.tenant} />
+                      <ApplicationDossier application={application} />
                       {application.message && <p className="application-message">« {application.message} »</p>}
                     </div>
                     <div className="application-actions">

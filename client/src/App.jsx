@@ -5,6 +5,7 @@ import HousingMap from './LazyHousingMap'
 import { ApplyBox, LandlordApplications, TenantApplications } from './Applications'
 import ProfileFields from './ProfileFields'
 import ProfilePanel from './ProfilePanel'
+import DossierPanel from './DossierPanel'
 import { emptyProfile, profilePayload } from './lib/profile'
 import './App.css'
 
@@ -842,6 +843,8 @@ function App() {
                 onWithdraw={(application) => updateApplicationStatus(application, 'withdrawn')}
                 onSelectHousing={selectHousing}
               />
+
+              <DossierPanel guarantorType={user.tenantProfile?.guarantorType || ''} />
             </>
           )}
         </section>

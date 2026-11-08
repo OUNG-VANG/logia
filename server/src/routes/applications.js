@@ -4,17 +4,28 @@ const Application = require('../models/Application');
 const Housing = require('../models/Housing');
 const User = require('../models/User');
 const requireAuth = require('../middleware/requireAuth');
+const TenantDocument = require('../models/TenantDocument');
 const { applicantSummary } = require('../lib/profile');
+const { dossierSummary } = require('../lib/dossier');
 
 const router = express.Router();
 const housingFields = 'title propertyType location rent charges images status';
 const applicantFields = 'email firstName lastName tenantProfile';
 
-// Remplace le compte locataire complet par ce qu'un propriétaire a le droit de voir.
-function forLandlord(application) {
-  const result = application.toObject();
-  result.tenant = applicantSummary(application.tenant);
-  return result;
+// Remplace le compte locataire complet par ce qu'un propriétaire a le droit de voir,
+// et ajoute l'état de son dossier (pièces fournies).
+async function forLandlord(applications) {
+  const tenantIds = applications.map((application) => application.tenant?._id).filter(Boolean);
+  const documents = await TenantDocument.find({ tenant: { $in: tenantIds } }).select('tenant category');
+  return applications.map((application) => {
+    const result = application.toObject();
+    result.tenant = applicantSummary(application.tenant);
+    if (application.tenant) {
+      const tenantDocuments = documents.filter((document) => document.tenant.equals(application.tenant._id));
+      result.dossier = dossierSummary(application.tenant, tenantDocuments);
+    }
+    return result;
+  });
 }
 
 function databaseUnavailable(res) {
@@ -120,7 +131,7 @@ router.get('/received', async (req, res) => {
       .populate('tenant', applicantFields)
       .sort({ createdAt: -1 })
       .limit(200);
-    return res.json({ applications: applications.map(forLandlord) });
+    return res.json({ applications: await forLandlord(applications) });
   } catch (error) {
     console.error('Erreur lors du chargement des candidatures reçues :', error.message);
     return res.status(500).json({ message: 'Impossible de charger les candidatures reçues pour le moment.' });
@@ -167,7 +178,8 @@ router.patch('/:id/status', async (req, res) => {
     application.housing.landlord = undefined;
     if (user.role === 'landlord') {
       await application.populate('tenant', applicantFields);
-      return res.json({ application: forLandlord(application) });
+      const [result] = await forLandlord([application]);
+      return res.json({ application: result });
     }
     return res.json({ application });
   } catch (error) {

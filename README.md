@@ -32,3 +32,13 @@ Les candidatures passent par `/api/applications` (authentification requise) :
 - `GET /api/applications/mine` : le locataire consulte ses candidatures et leur statut.
 - `GET /api/applications/received` : le propriétaire consulte les candidatures reçues sur ses annonces.
 - `PATCH /api/applications/:id/status` : le propriétaire accepte (`accepted`) ou refuse (`rejected`) ; le locataire retire une candidature en attente (`withdrawn`).
+
+Le dossier locataire passe par `/api/dossier` (authentification requise). Les pièces suivent le décret n° 2015-1437 : `identity`, `address`, `activity` et `income` sont obligatoires, `tax` est facultatif, et `guarantor` devient obligatoire si le locataire a déclaré un garant.
+
+- `GET /api/dossier/mine` : le locataire consulte ses pièces et la complétude de son dossier.
+- `POST /api/dossier/documents` : le locataire ajoute une pièce (`category`, `fileName`, `data` en data URL base64). PDF, JPG ou PNG, 5 Mo et 5 fichiers par pièce au maximum.
+- `DELETE /api/dossier/documents/:id` : le locataire retire une pièce (le fichier est effacé).
+- `GET /api/dossier/applicants/:tenantId` : un propriétaire consulte le dossier d’un candidat.
+- `GET /api/dossier/documents/:id/file` : ouvre une pièce.
+
+Les fichiers sont rangés dans `server/private-uploads/dossiers`, jamais servi publiquement. Un propriétaire n’y a accès que si le locataire a une candidature en attente ou acceptée sur l’une de ses annonces. `GET /api/applications/received` indique aussi l’état du dossier de chaque candidat (`dossier.providedCount`, `dossier.requiredCount`, `dossier.complete`).

@@ -1,0 +1,64 @@
+.dossier-panel { margin-top: 27px; }
+.dossier-intro { margin: -8px 0 16px; color: #76697f; font-size: 12px; line-height: 1.6; }
+
+.dossier-badge { flex: 0 0 auto; padding: 6px 11px; border-radius: 999px; background: #fdf0e6; color: #a34a00; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.dossier-badge.complete { background: #e6f4ea; color: #1f6b35; }
+
+.dossier-progress { height: 6px; margin: 0 0 18px; overflow: hidden; border-radius: 999px; background: #f1ebf5; }
+.dossier-progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #6502b9, #fc6700); transition: width .3s; }
+
+.dossier-list { margin: 0; padding: 0; list-style: none; }
+.dossier-item { padding: 14px 0; border-top: 1px solid #eee4f3; }
+.dossier-item-heading { display: flex; align-items: flex-start; gap: 12px; }
+.dossier-item-heading > div { flex: 1; min-width: 0; }
+.dossier-item h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; color: #321d3d; font-size: 13px; font-weight: 650; }
+.dossier-item-heading p { margin: 4px 0 0; color: #817489; font-size: 11px; line-height: 1.55; }
+.dossier-item-heading .dossier-note { color: #a34a00; }
+
+.dossier-check { width: 22px; height: 22px; flex: 0 0 auto; display: grid; place-items: center; border: 1.5px solid #d9cce3; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 800; }
+.dossier-item.provided .dossier-check { border-color: #1f8a46; background: #1f8a46; }
+
+.dossier-tag { padding: 2px 7px; border-radius: 999px; background: #f1edf4; color: #76697f; font-size: 9px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; }
+.dossier-tag.required { background: #efe2f7; color: #6502b9; }
+
+.dossier-file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); clip-path: inset(50%); white-space: nowrap; }
+.dossier-add { flex: 0 0 auto; min-height: 32px; display: inline-flex; align-items: center; padding: 0 13px; border: 1px solid #d9c5e8; border-radius: 6px; background: #fff; color: #6502b9; font-size: 11px; font-weight: 650; cursor: pointer; }
+.dossier-add:hover { background: #f8f4fb; }
+.dossier-add[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+.dossier-file-input:focus-visible + .dossier-add { outline: 2px solid #9460bd; outline-offset: 2px; }
+
+.dossier-files { margin: 10px 0 0 34px; padding: 0; list-style: none; }
+.dossier-files li { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px; background: #fbf8fd; }
+.dossier-files li + li { margin-top: 5px; }
+.dossier-file-name { min-width: 0; overflow: hidden; padding: 0; border: 0; background: none; color: #321d3d; font: inherit; font-size: 12px; font-weight: 600; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.dossier-file-name:hover { color: #6502b9; text-decoration: underline; }
+.dossier-files small { flex: 0 0 auto; color: #8b7e93; font-size: 10px; }
+.dossier-file-remove { margin-left: auto; padding: 0; border: 0; background: none; color: #a43c35; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.dossier-file-remove:disabled { opacity: .5; cursor: wait; }
+
+.dossier-legal { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid #eee4f3; color: #8b7e93; font-size: 10px; line-height: 1.6; }
+
+/* Vue propriétaire */
+.application-dossier-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.application-dossier-toggle { padding: 0; border: 0; background: none; color: #6502b9; font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
+.application-dossier-toggle:hover { text-decoration: underline; }
+
+.applicant-dossier { margin-top: 10px; padding: 10px 12px; border: 1px solid #eee4f3; border-radius: 8px; background: #fbf8fd; }
+.applicant-dossier ul { margin: 0; padding: 0; list-style: none; }
+.applicant-dossier li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; padding: 6px 0; font-size: 11px; }
+.applicant-dossier li + li { border-top: 1px solid #f0e8f4; }
+.applicant-dossier-label { color: #4b3d54; font-weight: 600; }
+.applicant-dossier li.provided .applicant-dossier-label span { color: #1f8a46; }
+.applicant-dossier li.missing .applicant-dossier-label span { color: #a99bae; }
+.applicant-dossier-files { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 10px; }
+.applicant-dossier-files button { max-width: 220px; overflow: hidden; padding: 0; border: 0; background: none; color: #6502b9; font: inherit; font-size: 11px; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.applicant-dossier-files button:hover { text-decoration: underline; }
+.applicant-dossier-files small { color: #8b7e93; }
+.applicant-dossier-missing { color: #a43c35; font-style: italic; }
+.applicant-dossier-feedback { margin: 10px 0 0; color: #76697f; font-size: 11px; }
+
+@media (max-width: 600px) {
+  .dossier-item-heading { flex-wrap: wrap; }
+  .dossier-add { margin-left: 34px; }
+  .dossier-files { margin-left: 0; }
+}
