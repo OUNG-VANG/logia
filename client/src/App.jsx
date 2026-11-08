@@ -569,7 +569,7 @@ function App() {
 
   if (!user && !showAuth) {
     return <LandingPage
-      listings={listings.filter((listing) => listing.status === 'published')}
+      listings={listings}
       loading={listingsLoading}
       error={housingError}
       onSignIn={() => openAuth('login')}
