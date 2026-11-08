@@ -7,9 +7,10 @@ const requireAuth = require('../middleware/requireAuth');
 const TenantDocument = require('../models/TenantDocument');
 const { applicantSummary, isProfileComplete } = require('../lib/profile');
 const { dossierSummary } = require('../lib/dossier');
+const { computeMatch } = require('../lib/matching');
 
 const router = express.Router();
-const housingFields = 'title propertyType location rent charges images status';
+const housingFields = 'title propertyType location rent charges areaM2 bedrooms availableFrom images status';
 const applicantFields = 'email firstName lastName tenantProfile';
 
 // Remplace le compte locataire complet par ce qu'un propriétaire a le droit de voir,
@@ -23,6 +24,11 @@ async function forLandlord(applications) {
     if (application.tenant) {
       const tenantDocuments = documents.filter((document) => document.tenant.equals(application.tenant._id));
       result.dossier = dossierSummary(application.tenant, tenantDocuments);
+      // Score de compatibilité entre le candidat et le logement demandé (sans âge ni sexe).
+      if (application.housing) {
+        const profile = application.tenant.tenantProfile ? application.tenant.tenantProfile.toObject() : {};
+        result.match = computeMatch(profile, application.housing, result.dossier);
+      }
     }
     return result;
   });

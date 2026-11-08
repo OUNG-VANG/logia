@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const housingRoutes = require('./routes/housing');
 const applicationRoutes = require('./routes/applications');
 const dossierRoutes = require('./routes/dossier');
+const matchingRoutes = require('./routes/matching');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -21,6 +22,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/housing', housingRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/dossier', dossierRoutes);
+app.use('/api/matching', matchingRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'API Logia opérationnelle.' });

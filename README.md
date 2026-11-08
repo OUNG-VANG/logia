@@ -43,3 +43,25 @@ Le dossier locataire passe par `/api/dossier` (authentification requise). Les pi
 - `GET /api/dossier/documents/:id/file` : ouvre une pièce.
 
 Les fichiers sont rangés dans `server/private-uploads/dossiers`, jamais servi publiquement. Un propriétaire n’y a accès que si le locataire a une candidature en attente ou acceptée sur l’une de ses annonces. `GET /api/applications/received` indique aussi l’état du dossier de chaque candidat (`dossier.providedCount`, `dossier.requiredCount`, `dossier.complete`).
+
+## Score de compatibilité (matching)
+
+Le score, de 0 à 100, mesure l’adéquation entre un locataire et un logement. Il est calculé dans `server/src/lib/matching.js` comme une moyenne pondérée de 7 critères notés de 0 à 1 :
+
+| Critère | Poids | Note maximale si… | Note nulle si… |
+| --- | --- | --- | --- |
+| Budget | 20 | loyer + charges ≤ budget | 20 % au-dessus du budget |
+| Taux d’effort | 25 | loyer + charges ≤ 33 % des revenus | ≥ 50 % des revenus |
+| Garantie | 15 | Visale, organisme ou garant familial | sans garant et revenus justes (0,2) |
+| Ville recherchée | 15 | même ville | autre ville |
+| Date d’emménagement | 10 | disponible à la date voulue | disponible plus de 90 jours après |
+| Taille du logement | 10 | surface ≥ 9 m² (1 pers.), 16 m² (2 pers.), +9 m² par personne | moins de 75 % de ce seuil |
+| Dossier | 5 | toutes les pièces obligatoires | aucune pièce |
+
+Un critère sans donnée est écarté et les poids restants sont renormalisés ; `confidence` indique la part des poids réellement utilisés. Il faut au moins un critère du profil (pas seulement le dossier) pour obtenir un score. L’âge, le sexe et la civilité ne sont jamais utilisés. Les seuils sont des repères courants (taux d’effort de 33 %, seuils de peuplement de la CAF) et peuvent être ajustés dans `weights` et `criteria`.
+
+- `GET /api/matching/recommendations?limit=6` : annonces publiées classées par score pour le locataire connecté.
+- `GET /api/matching/listings/:id` : score et détail par critère pour une annonce.
+- `GET /api/applications/received` renvoie aussi `match` pour chaque candidat ; l’interface les trie par compatibilité.
+
+Les tests du calcul se lancent depuis `server` avec `npm test`.

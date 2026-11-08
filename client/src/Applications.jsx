@@ -4,6 +4,7 @@ import { dossierCategoryLabels } from './lib/dossier'
 import { formatEuros, fullName, guarantorLabels, situationLabels } from './lib/profile'
 import ApplicantDossier from './ApplicantDossier'
 import ConfirmButton from './ConfirmButton'
+import { MatchBadge, MatchBreakdown } from './MatchScore'
 import './Applications.css'
 
 const applicationStatusLabels = {
@@ -211,8 +212,33 @@ export function TenantApplications({ applications, loading, error, busyId, onWit
 }
 
 // Candidatures reçues par le propriétaire.
+// Score du candidat pour ce logement, avec son détail à la demande.
+function ApplicationMatch({ match }) {
+  const [open, setOpen] = useState(false)
+  if (!match || match.score === null) return null
+  return (
+    <div className="application-match">
+      <div className="application-dossier-row">
+        <MatchBadge match={match} />
+        <span className="application-match-label">{match.level.label}</span>
+        <button className="application-dossier-toggle" type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+          {open ? 'Masquer le détail' : 'Voir le détail du score'}
+        </button>
+      </div>
+      {open && <MatchBreakdown match={match} />}
+    </div>
+  )
+}
+
+const sortOptions = {
+  match: (a, b) => (b.match?.score ?? -1) - (a.match?.score ?? -1) || new Date(b.createdAt) - new Date(a.createdAt),
+  date: (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+}
+
 export function LandlordApplications({ applications, loading, error, busyId, onDecide }) {
+  const [sortBy, setSortBy] = useState('match')
   const pendingCount = applications.filter((application) => application.status === 'pending').length
+  const sorted = [...applications].sort(sortOptions[sortBy])
 
   return (
     <section className="listings-panel applications-panel" aria-labelledby="received-applications-title">
@@ -220,12 +246,21 @@ export function LandlordApplications({ applications, loading, error, busyId, onD
         <div><p className="eyebrow">TES CANDIDATS</p><h2 id="received-applications-title">Candidatures reçues</h2></div>
         <span className="listing-count" title="En attente de réponse">{pendingCount}</span>
       </div>
+      {applications.length > 1 && (
+        <div className="applications-sort">
+          <label htmlFor="applications-sort">Trier par</label>
+          <select id="applications-sort" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+            <option value="match">Compatibilité</option>
+            <option value="date">Date de réception</option>
+          </select>
+        </div>
+      )}
       {loading ? <p className="listings-feedback">Chargement des candidatures…</p>
         : error ? <p className="listings-feedback form-error" role="alert">{error}</p>
           : !applications.length ? <p className="listings-feedback">Les candidatures des locataires apparaîtront ici.</p>
             : (
               <ul className="application-list">
-                {applications.map((application) => (
+                {sorted.map((application) => (
                   <li className="application-item" key={application._id}>
                     <div className="application-main">
                       <span className="application-title">{fullName(application.tenant) || application.tenant?.email || 'Locataire'}</span>
@@ -233,6 +268,7 @@ export function LandlordApplications({ applications, loading, error, busyId, onD
                         Pour « {application.housing?.title || 'Annonce supprimée'} » · Reçue le {formatDate(application.createdAt)}
                         {fullName(application.tenant) && application.tenant?.email && <> · <a href={`mailto:${application.tenant.email}`}>{application.tenant.email}</a></>}
                       </p>
+                      <ApplicationMatch match={application.match} />
                       <ApplicantFacts tenant={application.tenant} />
                       <ApplicationDossier application={application} />
                       {application.message && <p className="application-message">« {application.message} »</p>}

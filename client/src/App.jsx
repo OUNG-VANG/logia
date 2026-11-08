@@ -7,6 +7,8 @@ import ProfileFields from './ProfileFields'
 import ProfilePanel from './ProfilePanel'
 import DossierPanel from './DossierPanel'
 import ConfirmButton from './ConfirmButton'
+import Recommendations from './Recommendations'
+import { ListingMatch } from './MatchScore'
 import { emptyProfile, profilePayload } from './lib/profile'
 import './App.css'
 
@@ -558,6 +560,16 @@ function App() {
               <h2>Description</h2>
               <p className="housing-detail-description">{selectedHousing.description || 'Aucune description complémentaire.'}</p>
               {selectedHousing.landlordName && <p className="housing-detail-landlord">Proposé par <strong>{selectedHousing.landlordName}</strong></p>}
+              {user?.role === 'tenant' && (
+                <ListingMatch
+                  key={'match-' + selectedHousing._id}
+                  housingId={selectedHousing._id}
+                  onCompleteProfile={() => {
+                    setShowProfile(true)
+                    leaveDetailAndScrollTo('profile-title')
+                  }}
+                />
+              )}
               {user?.role === 'tenant' && (() => {
                 const application = applications.find((item) => item.housing?._id === selectedHousing._id)
                 return (
@@ -785,6 +797,15 @@ function App() {
             </div>
           ) : (
             <>
+              <Recommendations
+                user={user}
+                onSelectListing={selectHousing}
+                onCompleteProfile={() => {
+                  setShowProfile(true)
+                  window.setTimeout(() => document.getElementById('profile-title')?.scrollIntoView({ behavior: 'smooth' }), 80)
+                }}
+              />
+
               <section className="tenant-map-section" aria-labelledby="tenant-map-title">
                 <div className="section-heading">
                   <div><p className="eyebrow">LOGEMENTS À PROXIMITÉ</p><h2 id="tenant-map-title">Explore la carte</h2></div>
