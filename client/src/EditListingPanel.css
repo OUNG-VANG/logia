@@ -1,0 +1,14 @@
+.edit-listing-panel { margin-bottom: 22px; border-color: #d9c5e8; }
+.edit-listing-panel .section-heading { margin-bottom: 18px; }
+.edit-listing-panel .section-heading h2 { font-size: 18px; }
+.edit-listing-note { margin: -8px 0 16px; padding: 8px 11px; border-radius: 7px; background: #fdf4ec; color: #7a4a20; font-size: 11px; line-height: 1.5; }
+.optional-hint { margin-left: 4px; color: #a99bae; font-size: 10px; font-weight: 500; }
+.edit-photo-grid { margin-bottom: 12px; }
+.photo-preview.removed img { opacity: .3; filter: grayscale(1); }
+.photo-preview.new { outline: 2px solid #9460bd; outline-offset: -2px; }
+
+.listing-status-badge { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 700; letter-spacing: .3px; vertical-align: middle; }
+.listing-status-badge.status-rented { background: #e6f4ea; color: #1f6b35; }
+.listing-status-badge.status-draft { background: #f1edf4; color: #76697f; }
+.housing-card-edit { flex: 0 0 auto; min-height: 30px; padding: 0 11px; border: 1px solid #d9c5e8; border-radius: 6px; background: #fff; color: #6502b9; font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
+.housing-card-edit:hover { background: #f8f4fb; }

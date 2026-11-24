@@ -58,7 +58,7 @@ function marketByCity(listings) {
 // Statistiques des candidatures : statuts, taux d'acceptation, délai de réponse et lien avec le score.
 // Chaque candidature : { status, createdAt, decidedAt, matchScore }.
 function applicationStats(applications) {
-  const byStatus = { pending: 0, accepted: 0, rejected: 0, withdrawn: 0 };
+  const byStatus = { pending: 0, accepted: 0, rejected: 0, withdrawn: 0, closed: 0 };
   applications.forEach((application) => {
     if (byStatus[application.status] !== undefined) byStatus[application.status] += 1;
   });
@@ -107,4 +107,12 @@ function countBy(values) {
     .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
 }
 
-module.exports = { scoreBands, marketByCity, applicationStats, countBy, median };
+// Protection de la vie privée : un groupe trop petit (moins de `minimum` personnes) pourrait permettre
+// de reconnaître quelqu'un. Ces groupes sont regroupés dans « other ».
+function foldSmallGroups(rows, minimum = 3) {
+  const kept = rows.filter((row) => row.count >= minimum);
+  const folded = rows.filter((row) => row.count < minimum).reduce((sum, row) => sum + row.count, 0);
+  return folded ? [...kept, { key: 'other', count: folded, folded: true }] : kept;
+}
+
+module.exports = { scoreBands, marketByCity, applicationStats, countBy, foldSmallGroups, median };

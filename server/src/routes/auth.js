@@ -1,10 +1,13 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const requireAuth = require('../middleware/requireAuth');
 const { ProfileError, parseProfile, publicUser } = require('../lib/profile');
+const { passwordError, hashPassword, dummyHash, createResetToken, hashResetToken, RESET_TOKEN_MINUTES } = require('../lib/password');
+const { limits } = require('../lib/security');
+const { sendMail } = require('../lib/mailer');
+const { createToken } = require('../lib/tokens');
 
 const router = express.Router();
 const allowedRoles = new Set(['tenant', 'landlord']);
@@ -19,11 +22,6 @@ function getConfigurationError() {
   return null;
 }
 
-function createToken(user) {
-  return jwt.sign({ sub: user._id.toString() }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '1d',
-  });
-}
 
 function databaseUnavailable(res) {
   if (mongoose.connection.readyState === 1) return false;
@@ -32,7 +30,7 @@ function databaseUnavailable(res) {
   return true;
 }
 
-router.post('/register', async (req, res) => {
+router.post('/register', limits.register, async (req, res) => {
   if (databaseUnavailable(res)) return;
 
   const configurationError = getConfigurationError();
@@ -49,14 +47,16 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ message: 'Adresse e-mail invalide.' });
   }
 
-  if (Buffer.byteLength(password, 'utf8') < 8 || Buffer.byteLength(password, 'utf8') > 72) {
-    return res.status(400).json({
-      message: 'Le mot de passe doit contenir au moins 8 caractères et au maximum 72 octets.',
-    });
+  if (passwordError(password)) {
+    return res.status(400).json({ message: passwordError(password) });
   }
 
   if (!allowedRoles.has(role)) {
     return res.status(400).json({ message: 'Rôle invalide. Choisis tenant ou landlord.' });
+  }
+
+  if (body.acceptTerms !== true) {
+    return res.status(400).json({ message: 'Tu dois accepter la politique de confidentialité pour créer un compte.' });
   }
 
   let profile;
@@ -68,8 +68,8 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    const passwordHash = await bcrypt.hash(password, 12);
-    const user = await User.create({ email, passwordHash, role, ...profile });
+    const passwordHash = await hashPassword(password);
+    const user = await User.create({ email, passwordHash, role, ...profile, termsAcceptedAt: new Date() });
 
     return res.status(201).json({
       user: publicUser(user),
@@ -89,7 +89,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', limits.login, async (req, res) => {
   if (databaseUnavailable(res)) return;
 
   const configurationError = getConfigurationError();
@@ -107,9 +107,10 @@ router.post('/login', async (req, res) => {
 
   try {
     const user = await User.findOne({ email }).select('+passwordHash');
-    const passwordMatches = user && (await bcrypt.compare(password, user.passwordHash));
+    // Même temps de calcul que l'adresse existe ou non.
+    const passwordMatches = await bcrypt.compare(password, user ? user.passwordHash : dummyHash);
 
-    if (!passwordMatches) {
+    if (!user || !passwordMatches) {
       return res.status(401).json({ message: 'Adresse e-mail ou mot de passe incorrect.' });
     }
 
@@ -120,6 +121,68 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error('Erreur lors de la connexion :', error.message);
     return res.status(500).json({ message: 'Impossible de se connecter pour le moment.' });
+  }
+});
+
+// Mot de passe oublié : envoie un lien de réinitialisation. La réponse est la même que le compte
+// existe ou non, pour ne pas révéler quelles adresses sont inscrites.
+router.post('/forgot-password', limits.forgotPassword, async (req, res) => {
+  if (databaseUnavailable(res)) return;
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const genericMessage = 'Si un compte existe avec cette adresse, un lien de réinitialisation vient d’y être envoyé. Il est valable 1 heure.';
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    return res.status(400).json({ message: 'Adresse e-mail invalide.' });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+    if (user) {
+      const { token, hash, expiresAt } = createResetToken();
+      user.resetPasswordHash = hash;
+      user.resetPasswordExpires = expiresAt;
+      await user.save();
+      const appUrl = (process.env.APP_URL || 'http://localhost:5173').replace(/\/$/, '');
+      await sendMail({
+        to: user.email,
+        subject: 'Logia : réinitialise ton mot de passe',
+        text: `Bonjour${user.firstName ? ' ' + user.firstName : ''},\n\n`
+          + `Tu as demandé à réinitialiser ton mot de passe Logia. Ouvre ce lien pour en choisir un nouveau `
+          + `(il est valable ${RESET_TOKEN_MINUTES} minutes et ne fonctionne qu’une fois) :\n\n${appUrl}/?reset=${token}\n\n`
+          + `Si tu n’es pas à l’origine de cette demande, ignore ce message : ton mot de passe ne change pas.\n\nL’équipe Logia`,
+      });
+    }
+    return res.json({ message: genericMessage });
+  } catch (error) {
+    console.error('Erreur lors de la demande de réinitialisation :', error.message);
+    return res.status(500).json({ message: 'Impossible d’envoyer le lien pour le moment.' });
+  }
+});
+
+// Réinitialisation : le jeton du lien et le nouveau mot de passe.
+router.post('/reset-password', limits.resetPassword, async (req, res) => {
+  if (databaseUnavailable(res)) return;
+  const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!/^[a-f0-9]{64}$/.test(token)) {
+    return res.status(400).json({ message: 'Ce lien de réinitialisation est invalide.' });
+  }
+  if (passwordError(password)) return res.status(400).json({ message: passwordError(password) });
+
+  try {
+    const user = await User.findOne({ resetPasswordHash: hashResetToken(token), resetPasswordExpires: { $gt: new Date() } })
+      .select('+resetPasswordHash +resetPasswordExpires');
+    if (!user) {
+      return res.status(400).json({ message: 'Ce lien a expiré ou a déjà été utilisé. Demande un nouveau lien.' });
+    }
+    user.passwordHash = await hashPassword(password);
+    user.passwordChangedAt = new Date();
+    user.resetPasswordHash = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+    return res.json({ message: 'Ton mot de passe est modifié. Tu peux te connecter.' });
+  } catch (error) {
+    console.error('Erreur lors de la réinitialisation :', error.message);
+    return res.status(500).json({ message: 'Impossible de modifier le mot de passe pour le moment.' });
   }
 });
 

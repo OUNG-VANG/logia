@@ -33,7 +33,7 @@ test('candidatures : taux d’acceptation calculé sur les seules décisions', (
   assert.equal(stats.total, 5);
   assert.equal(stats.decided, 3);
   assert.equal(stats.acceptanceRate, 0.333);
-  assert.deepEqual(stats.byStatus, { pending: 1, accepted: 1, rejected: 2, withdrawn: 1 });
+  assert.deepEqual(stats.byStatus, { pending: 1, accepted: 1, rejected: 2, withdrawn: 1, closed: 0 });
   assert.equal(stats.averageScore, 65);
   assert.equal(stats.averageScoreAccepted, 90);
   assert.equal(stats.averageScoreRejected, 58);

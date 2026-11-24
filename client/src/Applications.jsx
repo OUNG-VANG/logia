@@ -12,6 +12,7 @@ const applicationStatusLabels = {
   accepted: 'Acceptée',
   rejected: 'Refusée',
   withdrawn: 'Retirée',
+  closed: 'Clôturée',
 }
 
 function formatDate(value) {

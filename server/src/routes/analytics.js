@@ -5,7 +5,7 @@ const Housing = require('../models/Housing');
 const User = require('../models/User');
 const requireAuth = require('../middleware/requireAuth');
 const { computeMatch } = require('../lib/matching');
-const { marketByCity, applicationStats, countBy } = require('../lib/analytics');
+const { marketByCity, applicationStats, countBy, foldSmallGroups } = require('../lib/analytics');
 const { trainAndEvaluate } = require('../lib/ml');
 
 const router = express.Router();
@@ -81,7 +81,8 @@ router.get('/', async (req, res) => {
       },
       market: marketByCity(listings),
       applications: { ...applicationStats(scored), estimatedScores },
-      applicantSituations: countBy([...applicants.values()].map((profile) => profile.situation)),
+      // Les situations comptant moins de 3 candidats sont regroupées pour éviter toute réidentification.
+      applicantSituations: foldSmallGroups(countBy([...applicants.values()].map((profile) => profile.situation))),
       model: { ...trainAndEvaluate(trainingSamples), estimatedSamples },
     });
   } catch (error) {

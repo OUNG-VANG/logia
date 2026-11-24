@@ -20,7 +20,8 @@ const applicationSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'accepted', 'rejected', 'withdrawn'],
+      // closed : l'annonce a été louée ou retirée avant une réponse du propriétaire.
+      enum: ['pending', 'accepted', 'rejected', 'withdrawn', 'closed'],
       default: 'pending',
       index: true,
     },

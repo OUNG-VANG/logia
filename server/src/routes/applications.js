@@ -109,7 +109,8 @@ router.post('/', async (req, res) => {
     }
 
     const existing = await Application.findOne({ tenant: tenant._id, housing: housing._id });
-    if (existing && existing.status !== 'withdrawn') {
+    // Une candidature retirée, ou clôturée puis l'annonce remise en ligne, peut être renvoyée.
+    if (existing && !['withdrawn', 'closed'].includes(existing.status)) {
       return res.status(409).json({ message: 'Tu as déjà postulé à ce logement.' });
     }
 
@@ -223,6 +224,9 @@ router.patch('/:id/status', async (req, res) => {
       }
       if (application.status === 'withdrawn') {
         return res.status(409).json({ message: 'Le locataire a retiré cette candidature.' });
+      }
+      if (application.status === 'closed') {
+        return res.status(409).json({ message: 'Cette candidature est clôturée : l’annonce n’est plus en ligne.' });
       }
     }
 

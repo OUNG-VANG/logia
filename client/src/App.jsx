@@ -11,6 +11,12 @@ import Recommendations from './Recommendations'
 import { ListingMatch } from './MatchScore'
 import Analytics from './Analytics'
 import { emptyProfile, profilePayload } from './lib/profile'
+import { fileToDataUrl, geocodeListingAddress, listingStatusLabels, normalizeCityName, optimizePhoto, propertyTypeLabels } from './lib/listing'
+import EditListingPanel from './EditListingPanel'
+import PrivacyPolicy from './PrivacyPolicy'
+import AccountData from './AccountData'
+import { ForgotPasswordForm, ResetPasswordPage } from './PasswordRecovery'
+import './EditListingPanel.css'
 import './App.css'
 
 const emptyHousingForm = {
@@ -25,79 +31,6 @@ const emptyHousingForm = {
   areaM2: '',
   bedrooms: '0',
   availableFrom: '',
-}
-
-const propertyTypeLabels = {
-  room: 'Chambre',
-  studio: 'Studio',
-  apartment: 'Appartement',
-  house: 'Maison',
-}
-
-function normalizeCityName(value) {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('fr-FR').trim()
-}
-
-async function geocodeListingAddress(address, postalCode, city) {
-  const query = new URLSearchParams({
-    q: [address, postalCode, city].filter(Boolean).join(' '),
-    limit: '5',
-    type: 'housenumber',
-  })
-  const response = await fetch('https://data.geopf.fr/geocodage/search?' + query.toString())
-  if (!response.ok) throw new Error('Le service de localisation ne répond pas. Réessaie dans un instant.')
-
-  const result = await response.json()
-  const cityKey = normalizeCityName(city)
-  const feature = result.features?.find((candidate) => {
-    const properties = candidate.properties || {}
-    return properties.type === 'housenumber'
-      && normalizeCityName(properties.city || properties.municipality || '') === cityKey
-      && (!postalCode || String(properties.postcode || '') === String(postalCode).trim())
-  })
-  const coordinates = feature?.geometry?.coordinates
-  if (!Array.isArray(coordinates) || coordinates.length < 2) {
-    throw new Error('Adresse introuvable avec un point précis. Vérifie le numéro, la rue, le code postal et la ville.')
-  }
-
-  return { longitude: coordinates[0], latitude: coordinates[1] }
-}
-
-function optimizePhoto(file) {
-  return new Promise((resolve, reject) => {
-    const sourceUrl = URL.createObjectURL(file)
-    const image = new Image()
-    image.onload = () => {
-      URL.revokeObjectURL(sourceUrl)
-      const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight))
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
-      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
-      const context = canvas.getContext('2d')
-      if (!context) return reject(new Error('Impossible de préparer cette photo.'))
-      context.fillStyle = '#ffffff'
-      context.fillRect(0, 0, canvas.width, canvas.height)
-      context.drawImage(image, 0, 0, canvas.width, canvas.height)
-      canvas.toBlob((blob) => {
-        if (!blob) return reject(new Error('Impossible de préparer cette photo.'))
-        resolve(new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }))
-      }, 'image/jpeg', 0.82)
-    }
-    image.onerror = () => {
-      URL.revokeObjectURL(sourceUrl)
-      reject(new Error('Ce fichier ne peut pas être lu comme une image.'))
-    }
-    image.src = sourceUrl
-  })
-}
-
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result)
-    reader.onerror = () => reject(new Error('Impossible de lire une photo sélectionnée.'))
-    reader.readAsDataURL(file)
-  })
 }
 
 function formatRent(value) {
@@ -117,6 +50,10 @@ function App() {
   const [registerProfile, setRegisterProfile] = useState(emptyProfile)
   const [showProfile, setShowProfile] = useState(false)
   const [showAnalytics, setShowAnalytics] = useState(false)
+  const [showPrivacy, setShowPrivacy] = useState(false)
+  const [acceptTerms, setAcceptTerms] = useState(false)
+  const [authNotice, setAuthNotice] = useState('')
+  const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('reset') || '')
   const [user, setUser] = useState(null)
   const [showAuth, setShowAuth] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -151,6 +88,22 @@ function App() {
   const [deletingListingId, setDeletingListingId] = useState('')
   const [deleteListingError, setDeleteListingError] = useState('')
   const [deleteListingMessage, setDeleteListingMessage] = useState('')
+  const [editingListingId, setEditingListingId] = useState('')
+
+  // Le serveur a refusé la session : retour à l'écran de connexion avec une explication.
+  useEffect(() => {
+    function onSessionExpired(event) {
+      setUser(null)
+      setSelectedHousing(null)
+      setShowProfile(false)
+      setShowAnalytics(false)
+      setMode('login')
+      setAuthNotice(event.detail || 'Ta session a expiré. Reconnecte-toi.')
+      setShowAuth(true)
+    }
+    window.addEventListener('logia:session-expired', onSessionExpired)
+    return () => window.removeEventListener('logia:session-expired', onSessionExpired)
+  }, [])
 
   useEffect(() => {
     const token = sessionStorage.getItem('logia-token')
@@ -313,7 +266,7 @@ function App() {
     try {
       const endpoint = mode === 'register' ? '/auth/register' : '/auth/login'
       const payload = mode === 'register'
-        ? { email, password, role, ...profilePayload(registerProfile, role) }
+        ? { email, password, role, acceptTerms, ...profilePayload(registerProfile, role) }
         : { email, password }
       const { data } = await api.post(endpoint, payload)
       sessionStorage.setItem('logia-token', data.token)
@@ -321,6 +274,7 @@ function App() {
       setShowAuth(false)
       setPassword('')
       setRegisterProfile(emptyProfile)
+      setAcceptTerms(false)
     } catch (requestError) {
       setError(
         requestError.response?.data?.message ||
@@ -334,6 +288,7 @@ function App() {
   function switchMode(nextMode) {
     setMode(nextMode)
     setError('')
+    setAuthNotice('')
     setPassword('')
     setShowPassword(false)
   }
@@ -342,6 +297,7 @@ function App() {
     setMode(nextMode)
     setRole(nextRole)
     setError('')
+    setAuthNotice('')
     setPassword('')
     setShowPassword(false)
     setSelectedHousing(null)
@@ -476,6 +432,28 @@ function App() {
     }
   }
 
+  function startEditingListing(listing) {
+    setDeleteListingError('')
+    setDeleteListingMessage('')
+    setEditingListingId(listing._id)
+    window.setTimeout(() => document.getElementById('my-listings-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  }
+
+  async function handleListingSaved(updated, closedCount) {
+    setListings((current) => current.map((item) => item._id === updated._id ? updated : item))
+    setEditingListingId('')
+    setDeleteListingMessage('L’annonce « ' + updated.title + ' » est mise à jour.'
+      + (closedCount ? ` ${closedCount} candidature${closedCount > 1 ? 's' : ''} en attente ${closedCount > 1 ? 'ont été clôturées' : 'a été clôturée'}.` : ''))
+    if (closedCount) {
+      try {
+        const { data } = await api.get('/applications/received')
+        setApplications(data.applications || [])
+      } catch {
+        // La liste se mettra à jour au prochain chargement.
+      }
+    }
+  }
+
   async function handlePhotoChange(event) {
     const files = Array.from(event.target.files || [])
     event.target.value = ''
@@ -521,8 +499,35 @@ function App() {
 
   const applicationsLoading = Boolean(user) && applicationsLoadedFor !== user.id
 
+  function openPrivacy() {
+    setShowPrivacy(true)
+    window.scrollTo({ top: 0 })
+  }
+
   if (checkingSession) {
     return <main className="loading-screen" aria-live="polite">Ouverture de ton espace…</main>
+  }
+
+  if (resetToken) {
+    return (
+      <ResetPasswordPage
+        token={resetToken}
+        onDone={(message) => {
+          window.history.replaceState(null, '', window.location.pathname)
+          setResetToken('')
+          if (message) {
+            setMode('login')
+            setError('')
+            setAuthNotice(message)
+            setShowAuth(true)
+          }
+        }}
+      />
+    )
+  }
+
+  if (showPrivacy) {
+    return <PrivacyPolicy onBack={() => { setShowPrivacy(false); window.scrollTo({ top: 0 }) }} />
   }
 
   if (selectedHousing) {
@@ -607,6 +612,7 @@ function App() {
       onSignIn={() => openAuth('login')}
       onRegister={(nextRole) => openAuth('register', nextRole)}
       onSelectListing={selectHousing}
+      onShowPrivacy={openPrivacy}
     />
   }
 
@@ -664,11 +670,14 @@ function App() {
           )}
 
           {showProfile && (
-            <ProfilePanel
-              user={user}
-              onSaved={setUser}
-              onClose={() => setShowProfile(false)}
-            />
+            <>
+              <ProfilePanel
+                user={user}
+                onSaved={setUser}
+                onClose={() => setShowProfile(false)}
+              />
+              <AccountData role={user.role} onDeleted={logout} onShowPrivacy={() => openPrivacy()} />
+            </>
           )}
 
           {isLandlord ? (
@@ -797,12 +806,21 @@ function App() {
                 )}
                 {deleteListingError && <p className="form-error" role="alert">{deleteListingError}</p>}
                 {deleteListingMessage && <p className="form-success" role="status">{deleteListingMessage}</p>}
+                {editingListingId && listings.some((listing) => listing._id === editingListingId) && (
+                  <EditListingPanel
+                    key={editingListingId}
+                    listing={listings.find((listing) => listing._id === editingListingId)}
+                    onSaved={handleListingSaved}
+                    onCancel={() => setEditingListingId('')}
+                  />
+                )}
                 <ListingResults
                   listings={listings}
                   loading={listingsLoading}
                   error={housingError}
                   emptyMessage="Tes annonces publiées apparaîtront ici."
                   onSelect={selectHousing}
+                  onEdit={startEditingListing}
                   onDelete={deleteListing}
                   deletingId={deletingListingId}
                 />
@@ -933,6 +951,9 @@ function App() {
         </div>
 
         <div className="form-panel">
+          {mode === 'forgot' ? (
+            <ForgotPasswordForm initialEmail={email} onBack={() => switchMode('login')} />
+          ) : (<>
           <div className="form-heading">
             <p className="eyebrow">{registering ? 'REJOINDRE LOGIA' : 'HEUREUX DE TE REVOIR'}</p>
             <h2 id="auth-title">{registering ? 'Créer mon compte' : 'Me connecter'}</h2>
@@ -952,6 +973,7 @@ function App() {
             >Connexion</button>
           </div>
 
+          {authNotice && <p className="form-success auth-notice" role="status">{authNotice}</p>}
           <form className="auth-form" onSubmit={handleSubmit}>
             <label htmlFor="email">Adresse e-mail</label>
             <input
@@ -991,6 +1013,10 @@ function App() {
               </button>
             </div>
 
+            {!registering && (
+              <button className="text-button forgot-link" type="button" onClick={() => switchMode('forgot')}>Mot de passe oublié ?</button>
+            )}
+
             {registering && (
               <>
                 <label htmlFor="role">Je suis</label>
@@ -999,6 +1025,14 @@ function App() {
                   <option value="landlord">Propriétaire d’un logement</option>
                 </select>
                 <ProfileFields role={role} value={registerProfile} onChange={setRegisterProfile} idPrefix="register" />
+                <label className="consent-field" htmlFor="accept-terms">
+                  <input id="accept-terms" type="checkbox" aria-label="J’accepte la politique de confidentialité et le traitement de mes données" checked={acceptTerms} onChange={(event) => setAcceptTerms(event.target.checked)} required />
+                  <span>
+                    J’accepte la{' '}
+                    <button className="inline-link" type="button" onClick={openPrivacy}>politique de confidentialité</button>
+                    {' '}et le traitement de mes données pour utiliser Logia.
+                  </span>
+                </label>
               </>
             )}
 
@@ -1009,6 +1043,7 @@ function App() {
             </button>
           </form>
           <p className="privacy-note">Tes informations servent à créer et sécuriser ton compte Logia.</p>
+          </>)}
         </div>
       </section>
       <footer className="site-footer"><span>logia.</span> Une recherche de logement plus humaine.</footer>
@@ -1016,7 +1051,7 @@ function App() {
   )
 }
 
-function ListingResults({ listings, loading, error, emptyMessage, onSelect, onDelete, deletingId }) {
+function ListingResults({ listings, loading, error, emptyMessage, onSelect, onEdit, onDelete, deletingId }) {
   if (loading) return <p className="listings-feedback">Chargement des logements…</p>
   if (error) return <p className="listings-feedback form-error" role="alert">{error}</p>
   if (!listings.length) return <p className="listings-feedback">{emptyMessage}</p>
@@ -1042,7 +1077,12 @@ function ListingResults({ listings, loading, error, emptyMessage, onSelect, onDe
             {listing.images?.[0] ? <img src={listing.images[0]} alt="" /> : <span>⌂</span>}
           </div>
           <div className="housing-card-content">
-            <p className="listing-type">{propertyTypeLabels[listing.propertyType] || 'Logement'}{listing.status === 'published' ? ' · Publiée' : ''}</p>
+            <p className="listing-type">
+              {propertyTypeLabels[listing.propertyType] || 'Logement'}
+              {listing.status && listing.status !== 'published' && (
+                <span className={'listing-status-badge status-' + listing.status}>{listingStatusLabels[listing.status]}</span>
+              )}
+            </p>
             <h3>{listing.title}</h3>
             <p className="listing-location">{listing.location?.city} · {listing.location?.postalCode}</p>
             <p className="listing-description">{listing.description || 'Une nouvelle annonce logement sur Logia.'}</p>
@@ -1051,9 +1091,19 @@ function ListingResults({ listings, loading, error, emptyMessage, onSelect, onDe
               {listing.areaM2 && <span>{listing.areaM2} m²</span>}
               {listing.bedrooms > 0 && <span>{listing.bedrooms} ch.</span>}
             </div>
-            {listing.status && listing.status !== 'published' && <p className="draft-note">Brouillon</p>}
             <div className="housing-card-footer">
               <p className="housing-card-link">Voir le détail <span aria-hidden="true">→</span></p>
+              {onEdit && (
+                <button
+                  className="housing-card-edit"
+                  type="button"
+                  aria-label={`Modifier l’annonce : ${listing.title}`}
+                  onClick={(event) => { event.stopPropagation(); onEdit(listing) }}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  Modifier
+                </button>
+              )}
               {onDelete && (
                 <ConfirmButton
                   className="housing-card-delete"

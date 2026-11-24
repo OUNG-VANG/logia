@@ -30,7 +30,7 @@ async function call(method, path, body, token) {
 }
 
 async function register(prefix, role, profile) {
-  const { data } = await call('POST', '/auth/register', { email: `${prefix}.${run}@test.local`, password, role, ...profile })
+  const { data } = await call('POST', '/auth/register', { email: `${prefix}.${run}@test.local`, password, role, acceptTerms: true, ...profile })
   return data.token
 }
 

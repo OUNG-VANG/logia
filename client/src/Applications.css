@@ -44,6 +44,7 @@ button.application-title:hover { color: #6502b9; }
 .status-accepted { background: #e6f4ea; color: #1f6b35; }
 .status-rejected { background: #fbe9e8; color: #a43c35; }
 .status-withdrawn { background: #f1edf4; color: #76697f; }
+.status-closed { background: #f1edf4; color: #76697f; }
 
 @media (max-width: 600px) {
   .application-item { flex-direction: column; }

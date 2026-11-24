@@ -232,6 +232,88 @@ router.delete('/:id', requireAuth, async (req, res) => {
   }
 });
 
+const editableStatuses = ['published', 'rented', 'draft'];
+
+function textField(value) {
+  return typeof value === 'string' ? value.trim() : undefined;
+}
+
+// Propriétaire : modifier son annonce (textes, loyer, photos, adresse, statut).
+router.patch('/:id', requireAuth, async (req, res) => {
+  if (databaseUnavailable(res)) return;
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ message: 'Identifiant de logement invalide.' });
+  }
+
+  let newImages = [];
+  try {
+    const listing = await Housing.findOne({ _id: req.params.id, landlord: req.auth.userId });
+    if (!listing) return res.status(404).json({ message: 'Logement introuvable dans tes annonces.' });
+
+    const body = req.body || {};
+    const updates = {};
+    ['title', 'description'].forEach((key) => {
+      if (body[key] !== undefined) updates[key] = textField(body[key]) ?? '';
+    });
+    if (body.propertyType !== undefined) updates.propertyType = body.propertyType;
+    ['rent', 'charges', 'areaM2', 'bedrooms'].forEach((key) => {
+      if (body[key] !== undefined) updates[key] = optionalNumber(body[key]);
+    });
+    if (body.availableFrom !== undefined) updates.availableFrom = body.availableFrom || null;
+    if (body.city !== undefined) updates['location.city'] = textField(body.city) ?? '';
+    if (body.postalCode !== undefined) updates['location.postalCode'] = textField(body.postalCode) ?? '';
+
+    // Nouvelle adresse : le client envoie les coordonnées trouvées par géocodage.
+    if (body.latitude !== undefined || body.longitude !== undefined) {
+      const latitude = optionalNumber(body.latitude);
+      const longitude = optionalNumber(body.longitude);
+      if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
+        || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+        return res.status(400).json({ message: 'Une adresse exacte est nécessaire pour placer le logement sur la carte.' });
+      }
+      Object.assign(updates, { 'location.latitude': latitude, 'location.longitude': longitude, 'location.precision': 'address' });
+    }
+
+    const previousStatus = listing.status;
+    if (body.status !== undefined) {
+      if (!editableStatuses.includes(body.status)) return res.status(400).json({ message: 'Statut d’annonce invalide.' });
+      updates.status = body.status;
+    }
+
+    // Photos : on retire celles demandées, puis on ajoute les nouvelles (5 au total au maximum).
+    const removeImages = Array.isArray(body.removeImages) ? body.removeImages.filter((image) => listing.images.includes(image)) : [];
+    const keptImages = listing.images.filter((image) => !removeImages.includes(image));
+    const addedCount = Array.isArray(body.images) ? body.images.length : 0;
+    if (keptImages.length + addedCount > maxPhotoCount) {
+      return res.status(400).json({ message: `Une annonce peut avoir jusqu’à ${maxPhotoCount} photos.` });
+    }
+    newImages = await saveListingImages(body.images);
+    updates.images = [...keptImages, ...newImages];
+
+    listing.set(updates);
+    await listing.save();
+
+    await Promise.all(removeImages.map((imagePath) => unlink(path.join(uploadsDirectory, path.basename(imagePath))).catch(() => {})));
+
+    // Annonce louée ou retirée : les candidatures encore en attente sont clôturées.
+    let closedApplications = 0;
+    if (previousStatus === 'published' && listing.status !== 'published') {
+      const result = await Application.updateMany({ housing: listing._id, status: 'pending' }, { $set: { status: 'closed' } });
+      closedApplications = result.modifiedCount || 0;
+    }
+
+    return res.json({ listing, closedApplications });
+  } catch (error) {
+    await Promise.all(newImages.map((imagePath) => unlink(path.join(uploadsDirectory, path.basename(imagePath))).catch(() => {})));
+    if (error.statusCode) return res.status(error.statusCode).json({ message: error.message });
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      return res.status(400).json({ message: 'Vérifie les informations de l’annonce.' });
+    }
+    console.error('Erreur lors de la modification du logement :', error.message);
+    return res.status(500).json({ message: 'Impossible de modifier le logement pour le moment.' });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   if (databaseUnavailable(res)) return;
   if (!mongoose.isValidObjectId(req.params.id)) {

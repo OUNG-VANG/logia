@@ -42,6 +42,13 @@ const userSchema = new mongoose.Schema(
     lastName: { type: String, trim: true, maxlength: 60 },
     gender: { type: String, enum: genders },
     tenantProfile: tenantProfileSchema,
+    // Date d'acceptation de la politique de confidentialité (consentement RGPD).
+    termsAcceptedAt: Date,
+    // Changement de mot de passe : les sessions ouvertes avant cette date ne sont plus acceptées.
+    passwordChangedAt: Date,
+    // Réinitialisation : empreinte du jeton envoyé par e-mail et date d'expiration.
+    resetPasswordHash: { type: String, select: false },
+    resetPasswordExpires: { type: Date, select: false },
   },
   { timestamps: true },
 );

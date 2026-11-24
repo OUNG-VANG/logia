@@ -1,5 +1,4 @@
 const express = require('express');
-const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
 require('dotenv').config();
@@ -9,11 +8,18 @@ const applicationRoutes = require('./routes/applications');
 const dossierRoutes = require('./routes/dossier');
 const matchingRoutes = require('./routes/matching');
 const analyticsRoutes = require('./routes/analytics');
+const accountRoutes = require('./routes/account');
+const { securityHeaders, corsPolicy, limits } = require('./lib/security');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-app.use(cors());
+// Derrière un hébergeur (proxy), TRUST_PROXY=1 permet de lire la vraie adresse IP pour les limites.
+if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
+
+app.use(securityHeaders);
+app.use(corsPolicy);
+app.use('/api', limits.api);
 app.use(express.json({ limit: '12mb' }));
 app.use('/api/uploads', express.static(path.join(__dirname, '../uploads'), {
   fallthrough: false,
@@ -25,6 +31,7 @@ app.use('/api/applications', applicationRoutes);
 app.use('/api/dossier', dossierRoutes);
 app.use('/api/matching', matchingRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/account', accountRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'API Logia opérationnelle.' });

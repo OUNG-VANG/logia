@@ -79,7 +79,7 @@ function ListingCarousel({ listings, loading, error, activeCity, onSelectListing
   )
 }
 
-function LandingPage({ listings, loading, error, onSignIn, onRegister, onSelectListing }) {
+function LandingPage({ listings, loading, error, onSignIn, onRegister, onSelectListing, onShowPrivacy }) {
   const [activeCity, setActiveCity] = useState('')
   const cities = useMemo(() => [...new Set(listings.map((listing) => listing.location?.city).filter(Boolean))], [listings])
 
@@ -201,7 +201,7 @@ function LandingPage({ listings, loading, error, onSignIn, onRegister, onSelectL
       <footer className="landing-footer">
         <a className="landing-logo" href="#accueil" aria-label="Logia, retour en haut"><img src="/logia-logo.png" alt="Logia" /></a>
         <p>Le logement, plus simplement.</p>
-        <nav aria-label="Liens de pied de page"><a href="#carte">Explorer</a><a href="#guides">Guides</a><a href="#contact">Contact</a><button type="button" onClick={onSignIn}>Mon espace</button></nav>
+        <nav aria-label="Liens de pied de page"><a href="#carte">Explorer</a><a href="#guides">Guides</a><a href="#contact">Contact</a><button type="button" onClick={onSignIn}>Mon espace</button><button type="button" onClick={onShowPrivacy}>Confidentialité</button></nav>
         <span className="landing-copyright">© {new Date().getFullYear()} Logia</span>
       </footer>
     </main>

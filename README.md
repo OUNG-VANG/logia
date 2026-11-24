@@ -20,11 +20,13 @@ Les modèles Mongoose se trouvent dans `server/src/models` : utilisateur, logeme
 
 L’authentification est disponible avec `POST /api/auth/register` et `POST /api/auth/login`. Le jeton Bearer retourné permet d’accéder à `GET /api/auth/me` et de modifier son profil avec `PATCH /api/auth/me`.
 
-À l’inscription, chaque compte renseigne `firstName`, `lastName` et `gender` (`female`, `male`, `other`, `undisclosed`). Un locataire renseigne aussi `tenantProfile` : `birthDate` et `situation` sont obligatoires (`student`, `apprentice`, `employee_permanent`, `employee_fixed_term`, `temporary_worker`, `self_employed`, `civil_servant`, `job_seeker`, `retired`, `other`) ; `occupationDetail`, `monthlyIncome`, `guarantorType` (`none`, `family`, `visale`, `organization`, `other`), `householdSize`, `desiredMoveIn`, `desiredCity` et `maxBudget` sont facultatifs. Les règles de validation sont dans `server/src/lib/profile.js`.
+L’inscription exige `acceptTerms: true` (acceptation de la politique de confidentialité, dont la date est enregistrée dans `termsAcceptedAt`). Chaque compte renseigne aussi `firstName`, `lastName` et `gender` (`female`, `male`, `other`, `undisclosed`). Un locataire renseigne aussi `tenantProfile` : `birthDate` et `situation` sont obligatoires (`student`, `apprentice`, `employee_permanent`, `employee_fixed_term`, `temporary_worker`, `self_employed`, `civil_servant`, `job_seeker`, `retired`, `other`) ; `occupationDetail`, `monthlyIncome`, `guarantorType` (`none`, `family`, `visale`, `organization`, `other`), `householdSize`, `desiredMoveIn`, `desiredCity` et `maxBudget` sont facultatifs. Les règles de validation sont dans `server/src/lib/profile.js`.
 
 Un propriétaire voit le nom, la situation, les revenus, le garant, le nombre d’occupants et la date d’emménagement de ses candidats, mais jamais leur date de naissance ni leur civilité : le sexe et l’âge ne doivent pas servir à choisir un locataire (article 225-1 du Code pénal). La fiche publique d’une annonce affiche le prénom et l’initiale du propriétaire. Les rôles accessibles à l’inscription sont `tenant` et `landlord` ; les comptes administrateur ne peuvent pas être créés via l’API publique.
 
 Les annonces sont accessibles avec `GET /api/housing` (filtres facultatifs `city` et `maxRent`). Un propriétaire authentifié peut publier une annonce avec `POST /api/housing` et consulter ses annonces avec `GET /api/housing/mine`. Il peut supprimer une de ses annonces avec `DELETE /api/housing/:id` : ses photos et les candidatures reçues sont supprimées avec elle.
+
+`PATCH /api/housing/:id` modifie une annonce (textes, loyer, surface, date, adresse via `latitude`/`longitude`, photos avec `removeImages` et `images`, 5 au maximum) et son statut : `published` (en ligne), `rented` (louée) ou `draft` (hors ligne). Seules les annonces en ligne apparaissent dans les recherches. Quand une annonce quitte le statut « en ligne », ses candidatures en attente passent au statut `closed` (clôturée) ; si elle revient en ligne, les locataires peuvent postuler de nouveau.
 
 Les candidatures passent par `/api/applications` (authentification requise) :
 
@@ -43,6 +45,22 @@ Le dossier locataire passe par `/api/dossier` (authentification requise). Les pi
 - `GET /api/dossier/documents/:id/file` : ouvre une pièce.
 
 Les fichiers sont rangés dans `server/private-uploads/dossiers`, jamais servi publiquement. Un propriétaire n’y a accès que si le locataire a une candidature en attente ou acceptée sur l’une de ses annonces. `GET /api/applications/received` indique aussi l’état du dossier de chaque candidat (`dossier.providedCount`, `dossier.requiredCount`, `dossier.complete`).
+
+## Sécurité
+
+- **En-têtes HTTP** posés par Helmet (HSTS, `nosniff`, protection contre l’affichage dans un cadre, politique de contenu).
+- **CORS** : seules les origines listées dans `CLIENT_ORIGIN` peuvent appeler l’API depuis un navigateur.
+- **Limites de requêtes** par adresse IP (`server/src/lib/security.js`) : 300 requêtes par minute sur l’API, 10 tentatives de connexion par 15 minutes, 10 créations de compte et 5 demandes de lien de réinitialisation par heure. `RATE_LIMITS=off` les désactive, uniquement pour un serveur de test (le script de démonstration en a besoin).
+- **Mots de passe** hachés avec bcrypt (12 tours), entre 8 caractères et 72 octets. La connexion prend le même temps que l’adresse existe ou non.
+- **Mot de passe oublié** : `POST /api/auth/forgot-password` envoie un lien valable 1 heure et utilisable une seule fois ; seule l’empreinte SHA-256 du jeton est stockée, et la réponse ne révèle pas si l’adresse a un compte. `POST /api/auth/reset-password` enregistre le nouveau mot de passe. Sans `SMTP_HOST`, le lien s’affiche dans la console du serveur.
+- **Changement de mot de passe** : `PATCH /api/account/password` (`currentPassword`, `newPassword`) renvoie un nouveau jeton. Après un changement ou une réinitialisation, toutes les sessions ouvertes avant sont refusées (code `SESSION_INVALID`) et l’application ramène à l’écran de connexion.
+- **Observatoire** : les situations de candidats qui comptent moins de 3 personnes sont regroupées, pour éviter de reconnaître quelqu’un.
+
+## Données personnelles (RGPD)
+
+- La politique de confidentialité est une page de l’application (lien en pied de page, à l’inscription et dans « Mon profil »). Elle est à relire et compléter (hébergeur, coordonnées du responsable) avant une mise en ligne publique.
+- `GET /api/account/export` : export JSON de toutes les données du compte (droits d’accès et de portabilité). Un propriétaire n’y reçoit pas les données personnelles de ses candidats.
+- `DELETE /api/account` avec `password` : suppression définitive du compte. Pour un locataire : profil, dossier (fichiers compris) et candidatures. Pour un propriétaire : profil, annonces, photos et candidatures reçues.
 
 ## Score de compatibilité (matching)
 
@@ -80,7 +98,7 @@ Le score de compatibilité est enregistré au moment de chaque candidature (`mat
 Pour remplir une base **de test** avec un jeu de démonstration (3 propriétaires, 10 annonces, 40 locataires, environ 120 candidatures dont 90 avec réponse), lance une API sur une base séparée puis le script :
 
 ```bash
-PORT=5099 MONGODB_URI=mongodb://127.0.0.1:27017/logia_demo npm start
+PORT=5099 MONGODB_URI=mongodb://127.0.0.1:27017/logia_demo RATE_LIMITS=off npm start
 node scripts/seed-demo.mjs http://localhost:5099/api
 ```
 

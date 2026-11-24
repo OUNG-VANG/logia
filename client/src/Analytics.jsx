@@ -8,6 +8,7 @@ const statusSegments = [
   { key: 'pending', label: 'En attente', className: 'status-warning' },
   { key: 'rejected', label: 'Refusées', className: 'status-critical' },
   { key: 'withdrawn', label: 'Retirées', className: 'status-neutral' },
+  { key: 'closed', label: 'Clôturées', className: 'status-neutral' },
 ]
 
 const formatPercent = (value) => (value === null || value === undefined ? '—' : Math.round(value * 100) + ' %')
@@ -377,7 +378,7 @@ function Analytics({ onBack }) {
           <div className="chart-heading chart-heading-spaced">
             <div>
               <h2>Situation des candidats</h2>
-              <p>Chaque candidat compté une fois.</p>
+              <p>Chaque candidat compté une fois. Les situations de moins de 3 personnes sont regroupées pour protéger leur anonymat.</p>
             </div>
           </div>
           {applicantSituations.length ? (
@@ -385,10 +386,10 @@ function Analytics({ onBack }) {
               ariaLabel="Situation des candidats"
               max={maxSituation}
               rows={applicantSituations.map((row) => ({
-                label: situationLabels[row.key] || row.key,
+                label: row.folded ? 'Autres (petits groupes)' : situationLabels[row.key] || row.key,
                 value: row.count,
                 display: row.count,
-                ariaLabel: `${situationLabels[row.key] || row.key} : ${row.count}`,
+                ariaLabel: `${row.folded ? 'Autres situations regroupées' : situationLabels[row.key] || row.key} : ${row.count}`,
                 tooltip: <><strong>{row.count}</strong> candidat{row.count > 1 ? 's' : ''}</>,
               }))}
             />
