@@ -133,6 +133,129 @@ function StatusBar({ byStatus, total }) {
   )
 }
 
+const criterionLabels = {
+  budget: 'Budget',
+  effortRate: 'Taux d’effort',
+  guarantor: 'Garantie',
+  location: 'Ville',
+  moveIn: 'Emménagement',
+  size: 'Taille',
+  dossier: 'Dossier',
+}
+
+const formatAuc = (value) => (value === null || value === undefined ? '—' : String(value.toFixed(2)).replace('.', ','))
+
+// Barres appariées par critère : poids fixé dans les règles contre importance apprise par le modèle.
+function WeightComparison({ criteria }) {
+  const max = Math.max(...criteria.flatMap((item) => [item.ruleWeight, item.learnedImportance]), 1)
+  return (
+    <div>
+      <ul className="chart-legend weight-legend">
+        <li><i className="series-rules" aria-hidden="true" /> Poids fixé dans les règles</li>
+        <li><i className="series-model" aria-hidden="true" /> Importance apprise par le modèle</li>
+      </ul>
+      <ul className="paired-bars" aria-label="Poids des règles et importance apprise, par critère">
+        {criteria.map((item) => (
+          <li key={item.key}>
+            <span className="ranked-label">{criterionLabels[item.key] || item.key}</span>
+            <div className="paired-tracks">
+              <div className="ranked-track">
+                <HoverBar
+                  className="ranked-bar series-rules"
+                  style={{ width: Math.max((item.ruleWeight / max) * 78, 1) + '%' }}
+                  ariaLabel={`${criterionLabels[item.key]} : poids des règles ${item.ruleWeight}`}
+                  tooltip={<><strong>{item.ruleWeight}</strong> / 100 dans les règles</>}
+                />
+                <span className="ranked-value">{item.ruleWeight}</span>
+              </div>
+              <div className="ranked-track">
+                <HoverBar
+                  className="ranked-bar series-model"
+                  style={{ width: Math.max((item.learnedImportance / max) * 78, 1) + '%' }}
+                  ariaLabel={`${criterionLabels[item.key]} : importance apprise ${item.learnedImportance}, coefficient ${item.coefficient}`}
+                  tooltip={<><strong>{item.learnedImportance}</strong> / 100 appris<br />coefficient {String(item.coefficient).replace('.', ',')}{item.coefficient < 0 ? ' (effet négatif)' : ''}</>}
+                />
+                <span className="ranked-value">{item.learnedImportance}{item.coefficient < 0 ? ' ↓' : ''}</span>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// Carte « Modèle appris » : régression logistique entraînée sur les décisions des propriétaires.
+function LearnedModel({ model }) {
+  if (model.status !== 'trained') {
+    return (
+      <article className="analytics-card analytics-card-wide">
+        <div className="chart-heading">
+          <div>
+            <h2>Apprentissage automatique</h2>
+            <p>Une régression logistique apprend, à partir des réponses des propriétaires, quels critères comptent vraiment.</p>
+          </div>
+        </div>
+        <p className="listings-feedback">
+          {model.status === 'single-class'
+            ? 'Toutes les réponses sont identiques (que des acceptations ou que des refus) : il faut les deux pour apprendre.'
+            : `Le modèle s’entraîne à partir de ${model.minDecisions} réponses de propriétaires. Actuellement : ${model.decisions}.`}
+        </p>
+      </article>
+    )
+  }
+
+  const { evaluation } = model
+  const better = evaluation.model.auc !== null && evaluation.rules.auc !== null
+    ? (evaluation.model.auc > evaluation.rules.auc + 0.02 ? 'model' : evaluation.rules.auc > evaluation.model.auc + 0.02 ? 'rules' : 'tie')
+    : null
+
+  return (
+    <article className="analytics-card analytics-card-wide">
+      <div className="chart-heading">
+        <div>
+          <h2>Apprentissage automatique : ce que les propriétaires regardent vraiment</h2>
+          <p>Régression logistique entraînée sur {plural(model.decisions, 'réponse')} de propriétaires ({model.accepted} acceptées), comparée au score à base de règles.</p>
+        </div>
+      </div>
+
+      <div className="model-metrics">
+        <div className="model-metric">
+          <span className="stat-label">AUC du score à base de règles</span>
+          <strong className="stat-value">{formatAuc(evaluation.rules.auc)}</strong>
+          <span className="stat-note">précision {formatPercent(evaluation.rules.accuracy)}</span>
+        </div>
+        <div className="model-metric">
+          <span className="stat-label">AUC du modèle appris</span>
+          <strong className="stat-value">{formatAuc(evaluation.model.auc)}</strong>
+          <span className="stat-note">précision {formatPercent(evaluation.model.accuracy)}</span>
+        </div>
+        <p className="model-reading">
+          L’AUC mesure si une candidature acceptée reçoit une note plus haute qu’une candidature refusée : 0,5 = hasard, 1 = parfait.
+          Mesuré par validation croisée en {evaluation.folds} plis (chaque candidature est prédite par un modèle qui ne l’a pas vue).{' '}
+          {better === 'model' && 'Ici, le modèle appris prédit mieux les décisions que les poids fixés à la main.'}
+          {better === 'rules' && 'Ici, le score à base de règles reste plus fiable que le modèle appris.'}
+          {better === 'tie' && 'Ici, les deux méthodes font jeu égal.'}
+        </p>
+      </div>
+
+      <WeightComparison criteria={model.criteria} />
+
+      {model.decisions < 100 && (
+        <p className="chart-note">Moins de 100 réponses : les poids appris restent instables, à interpréter avec prudence.</p>
+      )}
+      {model.estimatedSamples > 0 && (
+        <p className="chart-note">{plural(model.estimatedSamples, 'réponse')} sur des candidatures envoyées avant l’enregistrement des critères : notes estimées avec le profil actuel.</p>
+      )}
+      <DataTable
+        caption="Coefficients du modèle et poids des règles"
+        columns={['Critère', 'Poids des règles', 'Importance apprise', 'Coefficient']}
+        rows={model.criteria.map((item) => [criterionLabels[item.key] || item.key, item.ruleWeight, item.learnedImportance, String(item.coefficient).replace('.', ',')])}
+      />
+    </article>
+  )
+}
+
 function Analytics({ onBack }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -272,6 +395,8 @@ function Analytics({ onBack }) {
           ) : <p className="listings-feedback">Aucun candidat pour l’instant.</p>}
         </article>
       </div>
+
+      {data.model && <LearnedModel model={data.model} />}
 
       <p className="analytics-method">
         Méthode : le score de compatibilité est enregistré au moment de chaque candidature. Le taux d’acceptation ne compte que les

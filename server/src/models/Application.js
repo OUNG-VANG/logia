@@ -26,6 +26,8 @@ const applicationSchema = new mongoose.Schema(
     },
     // Score de compatibilité figé au moment de l'envoi, pour l'analyse (le profil peut changer ensuite).
     matchScore: { type: Number, min: 0, max: 100 },
+    // Note de chaque critère (0 à 1, ou null si non renseigné) au même moment : données d'entraînement du modèle.
+    matchCriteria: { type: mongoose.Schema.Types.Mixed },
     // Date à laquelle le propriétaire a accepté ou refusé.
     decidedAt: Date,
   },

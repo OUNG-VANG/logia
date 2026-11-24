@@ -1,5 +1,7 @@
 // Jeu de démonstration pour l'Observatoire et le matching.
-// Crée 3 propriétaires, 10 annonces, 12 locataires avec dossier complet, ~36 candidatures et des réponses.
+// Crée 3 propriétaires, 10 annonces, 40 locataires avec dossier complet, ~120 candidatures et ~95 réponses.
+// Les propriétaires simulés décident surtout selon le taux d'effort et le garant (préférences inventées),
+// ce qui permet de vérifier que le modèle d'apprentissage retrouve ces préférences.
 //
 // À lancer UNIQUEMENT contre une API branchée sur une base de test, jamais sur tes vraies données :
 //   PORT=5099 MONGODB_URI=mongodb://127.0.0.1:27017/logia_demo npm start
@@ -66,6 +68,21 @@ const tenants = [
   ['Léo', 'Garnier', 'male', 'temporary_worker', 1300, 'none', 1, 'Paris', 900],
 ]
 
+// Locataires supplémentaires générés au hasard (de façon reproductible) pour avoir assez de réponses.
+const firstNames = ['Lou', 'Noah', 'Jade', 'Adam', 'Lina', 'Sacha', 'Rose', 'Yanis', 'Alice', 'Rayan', 'Nina', 'Tom', 'Sofia', 'Mehdi']
+const situations = ['student', 'employee_permanent', 'employee_fixed_term', 'apprentice', 'self_employed', 'job_seeker', 'civil_servant', 'temporary_worker']
+const guarantors = ['none', 'family', 'visale', 'organization', 'other']
+const cities = ['Lyon', 'Paris', 'Bordeaux', 'Toulouse']
+for (let index = 0; index < 28; index += 1) {
+  const income = [600, 900, 1200, 1500, 1900, 2400, 3100][Math.floor(random() * 7)]
+  tenants.push([
+    firstNames[index % firstNames.length], 'Demo' + index, random() < 0.5 ? 'female' : 'male',
+    situations[Math.floor(random() * situations.length)], income,
+    guarantors[Math.floor(random() * guarantors.length)], 1 + Math.floor(random() * 3),
+    cities[Math.floor(random() * cities.length)], Math.round((income * 0.45) / 50) * 50,
+  ])
+}
+
 const landlordTokens = []
 for (const [index, landlord] of landlords.entries()) landlordTokens.push(await register('proprio' + index, 'landlord', landlord))
 
@@ -91,16 +108,19 @@ for (const [index, [firstName, lastName, gender, situation, monthlyIncome, guara
   const choices = [...local.slice(0, 2), others[Math.floor(random() * others.length)]]
   for (const listing of choices) {
     const { status, data } = await call('POST', '/applications', { housingId: listing.id, message: 'Bonjour, je suis intéressé·e.' }, token)
-    if (status === 201) decisions.push({ id: data.application._id, owner: listing.owner, score: data.application.matchScore })
+    if (status === 201) decisions.push({ id: data.application._id, owner: listing.owner, criteria: data.application.matchCriteria || {} })
   }
 }
 
-// Réponses des propriétaires : plus le score est haut, plus l'acceptation est probable (avec du bruit).
-// Quelques candidatures restent en attente.
+// Réponses des propriétaires simulés : surtout le taux d'effort et le garant, un peu le dossier,
+// presque pas la ville (avec du bruit). Quelques candidatures restent en attente.
+const note = (criteria, key) => (Number.isFinite(criteria[key]) ? criteria[key] : 0.5)
 let answered = 0
 for (const decision of decisions) {
   if (random() < 0.2) continue
-  const probability = 0.1 + 0.8 * ((decision.score ?? 50) / 100) ** 2
+  const c = decision.criteria
+  const logit = -3.2 + 3.5 * note(c, 'effortRate') + 2 * note(c, 'guarantor') + 0.8 * note(c, 'size') + 0.3 * note(c, 'location')
+  const probability = 1 / (1 + Math.exp(-logit))
   const status = random() < probability ? 'accepted' : 'rejected'
   const { status: code } = await call('PATCH', `/applications/${decision.id}/status`, { status }, decision.owner)
   if (code === 200) answered += 1

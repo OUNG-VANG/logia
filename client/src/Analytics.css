@@ -81,6 +81,21 @@
 .chart-legend li { display: inline-flex; align-items: center; gap: 6px; }
 .chart-legend i { width: 10px; height: 10px; border-radius: 2px; }
 
+/* Modèle appris */
+.analytics { --series-rules: #2a78d6; --series-model: #eb6834; }
+.model-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 200px)) minmax(0, 1fr); gap: 12px 18px; align-items: start; margin-bottom: 22px; }
+.model-metric { display: flex; flex-direction: column; gap: 3px; padding: 14px 16px; border: 1px solid #eee4f3; border-radius: 10px; }
+.model-reading { margin: 0; color: var(--ink-secondary); font-size: 12px; line-height: 1.6; }
+.weight-legend { margin: 0 0 10px; }
+.chart-legend i.series-rules, .ranked-bar.series-rules { background: var(--series-rules); }
+.chart-legend i.series-model, .ranked-bar.series-model { background: var(--series-model); }
+.ranked-bar.series-rules:hover, .ranked-bar.series-model:hover { filter: brightness(1.08); }
+.paired-bars { margin: 0; padding: 0; list-style: none; }
+.paired-bars > li { display: grid; grid-template-columns: minmax(80px, 22%) 1fr; align-items: center; gap: 10px; padding: 6px 0; }
+.paired-bars > li + li { border-top: 1px solid #f6f1f9; }
+.paired-tracks { display: flex; flex-direction: column; gap: 2px; }
+.paired-tracks .ranked-bar { height: 12px; }
+
 /* Tableau de données */
 .chart-table { margin-top: 14px; }
 .chart-table summary { color: #6502b9; font-size: 11px; font-weight: 650; cursor: pointer; }
@@ -97,6 +112,8 @@
 .analytics-link { padding: 4px 0; }
 
 @media (max-width: 900px) {
+  .model-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .model-reading { grid-column: 1 / -1; }
   .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .analytics-grid { grid-template-columns: 1fr; }
 }

@@ -6,6 +6,7 @@ const User = require('../models/User');
 const requireAuth = require('../middleware/requireAuth');
 const { computeMatch } = require('../lib/matching');
 const { marketByCity, applicationStats, countBy } = require('../lib/analytics');
+const { trainAndEvaluate } = require('../lib/ml');
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ router.get('/', async (req, res) => {
     const [listings, applications, tenantCount, landlordCount] = await Promise.all([
       Housing.find({ status: 'published' }).select('location rent charges areaM2').lean(),
       Application.find({})
-        .select('tenant housing status createdAt decidedAt updatedAt matchScore')
+        .select('tenant housing status createdAt decidedAt updatedAt matchScore matchCriteria')
         .populate('tenant', 'tenantProfile')
         .populate('housing', 'location rent charges areaM2 bedrooms propertyType availableFrom')
         .lean(),
@@ -31,11 +32,27 @@ router.get('/', async (req, res) => {
 
     // Les candidatures envoyées avant l'enregistrement du score sont estimées avec le profil actuel.
     let estimatedScores = 0;
+    const trainingSamples = [];
+    let estimatedSamples = 0;
     const scored = applications.map((application) => {
       let { matchScore } = application;
-      if (!Number.isFinite(matchScore) && application.tenant && application.housing) {
-        matchScore = computeMatch(application.tenant.tenantProfile || {}, application.housing).score;
-        if (Number.isFinite(matchScore)) estimatedScores += 1;
+      let criteria = application.matchCriteria;
+      let estimated = false;
+      if ((!Number.isFinite(matchScore) || !criteria) && application.tenant && application.housing) {
+        const match = computeMatch(application.tenant.tenantProfile || {}, application.housing);
+        if (!Number.isFinite(matchScore)) {
+          matchScore = match.score;
+          if (Number.isFinite(matchScore)) estimatedScores += 1;
+        }
+        if (!criteria) {
+          criteria = Object.fromEntries(match.criteria.map((criterion) => [criterion.key, criterion.score]));
+          estimated = true;
+        }
+      }
+      // Données d'apprentissage : seulement les candidatures avec une décision du propriétaire.
+      if ((application.status === 'accepted' || application.status === 'rejected') && criteria && Number.isFinite(matchScore)) {
+        trainingSamples.push({ criteria, matchScore, accepted: application.status === 'accepted' });
+        if (estimated) estimatedSamples += 1;
       }
       const decided = application.status === 'accepted' || application.status === 'rejected';
       return {
@@ -65,6 +82,7 @@ router.get('/', async (req, res) => {
       market: marketByCity(listings),
       applications: { ...applicationStats(scored), estimatedScores },
       applicantSituations: countBy([...applicants.values()].map((profile) => profile.situation)),
+      model: { ...trainAndEvaluate(trainingSamples), estimatedSamples },
     });
   } catch (error) {
     console.error('Erreur lors du calcul des statistiques :', error.message);

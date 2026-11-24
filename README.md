@@ -77,11 +77,24 @@ La page « Observatoire », accessible depuis le tableau de bord, affiche des st
 
 Le score de compatibilité est enregistré au moment de chaque candidature (`matchScore`) et la date de la réponse du propriétaire dans `decidedAt`. Le taux d’acceptation ne compte que les candidatures acceptées ou refusées. Les calculs sont dans `server/src/lib/analytics.js` et testés avec `npm test`.
 
-Pour remplir une base **de test** avec un jeu de démonstration (3 propriétaires, 10 annonces, 12 locataires, environ 36 candidatures), lance une API sur une base séparée puis le script :
+Pour remplir une base **de test** avec un jeu de démonstration (3 propriétaires, 10 annonces, 40 locataires, environ 120 candidatures dont 90 avec réponse), lance une API sur une base séparée puis le script :
 
 ```bash
 PORT=5099 MONGODB_URI=mongodb://127.0.0.1:27017/logia_demo npm start
 node scripts/seed-demo.mjs http://localhost:5099/api
 ```
 
-Le script ne doit jamais viser ta vraie base. Il dépose de petits fichiers de test dans `server/private-uploads/dossiers`.
+Le script ne doit jamais viser ta vraie base. Il dépose de petits fichiers de test dans `server/private-uploads/dossiers`. Les propriétaires simulés y décident surtout selon le taux d’effort et le garant : ce sont des préférences inventées, utiles pour vérifier que le modèle d’apprentissage les retrouve.
+
+## Apprentissage automatique
+
+En complément du score à base de règles, une **régression logistique** (`server/src/lib/ml.js`, sans librairie) apprend à prédire l’acceptation d’une candidature à partir des décisions réelles des propriétaires :
+
+- **Entrées :** les 7 notes de critères du score (0 à 1), enregistrées avec chaque candidature dans `matchCriteria`. Un critère non renseigné vaut 0,5.
+- **Entraînement :** descente de gradient (3 000 itérations, pas 0,5) avec régularisation L2 (0,01), à partir de 30 réponses de propriétaires mêlant acceptations et refus.
+- **Évaluation :** validation croisée en 5 plis, reproductible. L’AUC et la précision du modèle sont comparées à celles du score à base de règles sur les mêmes candidatures.
+- **Lecture :** chaque coefficient indique le poids qu’accordent réellement les propriétaires à un critère. L’Observatoire compare cette « importance apprise » aux poids fixés dans les règles.
+
+Le modèle n’intervient pas dans les décisions ni dans le classement des candidats : il sert à évaluer et à recalibrer les poids du score. L’âge et le sexe n’en font jamais partie. Les tests (`npm test`) vérifient notamment qu’il retrouve les bons critères sur des données synthétiques.
+
+Sur le jeu de démonstration (92 réponses), le modèle retrouve les préférences simulées (taux d’effort et garant en tête) avec une AUC de 0,83, contre 0,82 pour le score à base de règles. Ces chiffres viennent de données simulées et ne mesurent pas le comportement de vrais propriétaires.

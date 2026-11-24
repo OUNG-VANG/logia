@@ -123,7 +123,9 @@ router.post('/', async (req, res) => {
     }
 
     const profile = readiness.tenant.tenantProfile ? readiness.tenant.tenantProfile.toObject() : {};
-    const matchScore = computeMatch(profile, housing, readiness.dossier).score ?? undefined;
+    const match = computeMatch(profile, housing, readiness.dossier);
+    const matchScore = match.score ?? undefined;
+    const matchCriteria = Object.fromEntries(match.criteria.map((criterion) => [criterion.key, criterion.score]));
 
     let application;
     if (existing) {
@@ -131,10 +133,11 @@ router.post('/', async (req, res) => {
       existing.status = 'pending';
       existing.message = message;
       existing.matchScore = matchScore;
+      existing.matchCriteria = matchCriteria;
       existing.decidedAt = undefined;
       application = await existing.save();
     } else {
-      application = await Application.create({ tenant: tenant._id, housing: housing._id, message, matchScore });
+      application = await Application.create({ tenant: tenant._id, housing: housing._id, message, matchScore, matchCriteria });
     }
 
     await application.populate('housing', housingFields);
